@@ -7,6 +7,7 @@ import { StatusBadge, PriorityBadge } from '../components/Badges';
 import { Plus, Search, Filter, MessageSquare, FileText, Globe, Link2, LayoutGrid, List as ListIcon, ThumbsUp, ThumbsDown, CalendarDays, AlertTriangle, Snowflake, X, Lightbulb } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import PageHeader from '../components/PageHeader';
+import EmptyState from '../components/EmptyState';
 
 type FilterTab = 'all' | 'active' | 'frozen';
 

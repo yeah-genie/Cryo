@@ -1,8 +1,8 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { useNavigate } from 'react-router-dom';
 import { StatusBadge } from '../components/Badges';
+import EmptyState from '../components/EmptyState';
 import { Snowflake, ArrowRight, Activity, Lightbulb, Clock, BarChart2, Globe, Zap, Sparkles } from 'lucide-react';
 import { TriggerType, IdeaStatus } from '../types';
 import { analyzeSmartWake } from '../services/geminiService';
@@ -60,6 +60,11 @@ const Dashboard: React.FC = () => {
     markActivityAsRead(activityId);
     if (type === 'Idea') navigate(`/ideas/${entityId}`);
   };
+
+  // Show EmptyState if no ideas at all
+  if (ideas.length === 0) {
+    return <EmptyState type="dashboard" />;
+  }
 
   return (
     <div className="h-full flex flex-col gap-6 overflow-auto">
