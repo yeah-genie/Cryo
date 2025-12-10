@@ -114,7 +114,7 @@ const IdeaList: React.FC = () => {
       status: IdeaStatus.Active,
       priority: newIdeaPriority,
       category: newIdeaCategory,
-      workspace_id: currentWorkspace.workspace_id,
+      workspace_id: currentWorkspace?.workspace_id || '',
       created_by_user_id: currentUser?.user_id || 'anonymous',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),

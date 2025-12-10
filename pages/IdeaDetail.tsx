@@ -1,4 +1,4 @@
-
+﻿
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
@@ -41,20 +41,20 @@ const IdeaDetail: React.FC = () => {
         const isSnooze = idea.status === IdeaStatus.Active || idea.status === IdeaStatus.Frozen;
         const updated: Idea = { ...idea, status: isSnooze ? idea.status : IdeaStatus.Archived, archived_at: !isSnooze ? new Date().toISOString() : idea.archived_at, archive_reason: archiveReason, trigger_type: triggerType, trigger_date: triggerType === TriggerType.Time ? triggerDate : undefined, trigger_metric: triggerType === TriggerType.Metric ? triggerMetric : undefined, updated_at: new Date().toISOString(), is_zombie: false };
         updateIdea(updated);
-        addDecision({ decision_id: uuidv4(), idea_id: idea.idea_id, type: isSnooze ? DecisionType.Snooze : DecisionType.Review, title: isSnooze ? 'Trigger Updated' : 'Archived', content: archiveReason || 'Trigger updated', outcome: DecisionOutcome.Deferred, decided_by_user_id: currentUser.user_id, decided_at: new Date().toISOString(), workspace_id: currentWorkspace.workspace_id });
+        addDecision({ decision_id: uuidv4(), idea_id: idea.idea_id, type: isSnooze ? DecisionType.Snooze : DecisionType.Review, title: isSnooze ? 'Trigger Updated' : 'Archived', content: archiveReason || 'Trigger updated', outcome: DecisionOutcome.Deferred, decided_by_user_id: currentUser.user_id, decided_at: new Date().toISOString(), workspace_id: currentWorkspace?.workspace_id });
         setIsArchiveModalOpen(false);
     };
 
     const handleKill = (e: React.FormEvent) => {
         e.preventDefault();
         updateIdea({ ...idea, status: IdeaStatus.Killed, updated_at: new Date().toISOString(), is_zombie: false });
-        addDecision({ decision_id: uuidv4(), idea_id: idea.idea_id, type: DecisionType.Kill, title: 'Killed', content: archiveReason, outcome: DecisionOutcome.Rejected, decided_by_user_id: currentUser.user_id, decided_at: new Date().toISOString(), workspace_id: currentWorkspace.workspace_id });
+        addDecision({ decision_id: uuidv4(), idea_id: idea.idea_id, type: DecisionType.Kill, title: 'Killed', content: archiveReason, outcome: DecisionOutcome.Rejected, decided_by_user_id: currentUser.user_id, decided_at: new Date().toISOString(), workspace_id: currentWorkspace?.workspace_id });
         setIsKillModalOpen(false);
     };
 
     const handleWake = () => {
         updateIdea({ ...idea, status: IdeaStatus.Active, is_zombie: false, zombie_reason: undefined, updated_at: new Date().toISOString() });
-        addDecision({ decision_id: uuidv4(), idea_id: idea.idea_id, type: DecisionType.Resurrect, title: 'Woken from Icebox', content: `Trigger: ${idea.zombie_reason}`, outcome: DecisionOutcome.Approved, decided_by_user_id: currentUser.user_id, decided_at: new Date().toISOString(), workspace_id: currentWorkspace.workspace_id });
+        addDecision({ decision_id: uuidv4(), idea_id: idea.idea_id, type: DecisionType.Resurrect, title: 'Woken from Icebox', content: `Trigger: ${idea.zombie_reason}`, outcome: DecisionOutcome.Approved, decided_by_user_id: currentUser.user_id, decided_at: new Date().toISOString(), workspace_id: currentWorkspace?.workspace_id });
     };
 
     const handleVote = (tag: VoteTag) => { voteIdea(idea.idea_id, tag); setIsVotePopoverOpen(false); };
@@ -442,3 +442,4 @@ const IdeaDetail: React.FC = () => {
 };
 
 export default IdeaDetail;
+
