@@ -3,50 +3,71 @@
 ## 1. Discord Developer Portal
 
 1. https://discord.com/developers/applications 접속
-2. **New Application** 클릭
-3. 이름: `Cryo` 입력
+2. Cryo 앱 선택
 
-## 2. Bot 설정
+## 2. 슬래시 명령어 등록
 
-1. 왼쪽 메뉴 → **Bot**
-2. **Reset Token** → 토큰 복사 (DISCORD_BOT_TOKEN)
-3. **Privileged Gateway Intents** 활성화:
-   - MESSAGE CONTENT INTENT ✅
-   - SERVER MEMBERS INTENT ✅
+**Bot** 메뉴에서 **applications.commands** 스코프 확인
 
-## 3. OAuth2 설정
-
-1. 왼쪽 메뉴 → **OAuth2** → **URL Generator**
-2. Scopes: `bot`, `applications.commands`
-3. Bot Permissions:
-   - Read Messages/View Channels
-   - Send Messages
-   - Add Reactions
-   - Read Message History
-4. 생성된 URL로 서버에 봇 초대
-
-## 4. Interactions Endpoint
-
-1. 왼쪽 메뉴 → **General Information**
-2. **PUBLIC KEY** 복사 (DISCORD_PUBLIC_KEY)
-3. **Interactions Endpoint URL** 설정:
-   ```
-   https://[YOUR_SUPABASE_PROJECT].supabase.co/functions/v1/discord-freeze
-   ```
-
-## 5. Supabase 환경변수
+Discord API로 명령어 등록 (터미널에서 실행):
 
 ```bash
-DISCORD_BOT_TOKEN=your_bot_token
-DISCORD_PUBLIC_KEY=your_public_key
+# DISCORD_BOT_TOKEN과 APPLICATION_ID를 교체하세요
+
+curl -X POST \
+  "https://discord.com/api/v10/applications/YOUR_APPLICATION_ID/commands" \
+  -H "Authorization: Bot YOUR_BOT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '[
+    {
+      "name": "freeze",
+      "description": "Freeze an idea",
+      "options": [{
+        "name": "idea",
+        "description": "Your idea to freeze",
+        "type": 3,
+        "required": true
+      }]
+    },
+    {
+      "name": "thaw",
+      "description": "Thaw a frozen idea",
+      "options": [{
+        "name": "id",
+        "description": "Idea ID to thaw",
+        "type": 3,
+        "required": true
+      }]
+    },
+    {
+      "name": "vote",
+      "description": "Vote for an idea",
+      "options": [{
+        "name": "id",
+        "description": "Idea ID to vote for",
+        "type": 3,
+        "required": true
+      }]
+    },
+    {
+      "name": "list",
+      "description": "List frozen ideas"
+    }
+  ]'
 ```
 
-## 6. 사용법
+## 3. 사용법
 
-| 이모지 | 기능 |
+| 명령어 | 설명 |
 |--------|------|
-| ❄️ | 아이디어 저장 |
-| 🔥 | 해동 |
-| 👍 | 투표 |
+| `/freeze [idea]` | 아이디어 저장 |
+| `/thaw [id]` | 해동 |
+| `/vote [id]` | 투표 |
+| `/list` | 목록 보기 |
 
-메시지에 이모지만 추가하면 자동으로 작동합니다!
+## 4. Supabase 환경변수
+
+```
+DISCORD_PUBLIC_KEY=xxx
+DISCORD_BOT_TOKEN=xxx
+```
