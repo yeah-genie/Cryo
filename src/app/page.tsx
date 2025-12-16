@@ -228,8 +228,8 @@ function ScrollReveal({ children, delay = 0 }: { children: React.ReactNode; dela
   );
 }
 
-// Counter Component
-function AnimatedCounter({ target, duration = 2 }: { target: number; duration?: number }) {
+// Counter Component - using easing for smooth animation
+function AnimatedCounter({ target, duration = 2, decimals = 0 }: { target: number; duration?: number; decimals?: number }) {
   const [count, setCount] = useState(0);
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true });
@@ -237,20 +237,34 @@ function AnimatedCounter({ target, duration = 2 }: { target: number; duration?: 
   useEffect(() => {
     if (!isInView) return;
     
-    let start = 0;
-    const end = target;
-    const incrementTime = (duration * 1000) / end;
+    const startTime = Date.now();
+    const endTime = startTime + duration * 1000;
     
-    const timer = setInterval(() => {
-      start += 1;
-      setCount(start);
-      if (start >= end) clearInterval(timer);
-    }, incrementTime);
-
-    return () => clearInterval(timer);
+    const easeOutQuart = (t: number) => 1 - Math.pow(1 - t, 4);
+    
+    const updateCount = () => {
+      const now = Date.now();
+      const progress = Math.min((now - startTime) / (duration * 1000), 1);
+      const easedProgress = easeOutQuart(progress);
+      const currentCount = easedProgress * target;
+      
+      setCount(currentCount);
+      
+      if (now < endTime) {
+        requestAnimationFrame(updateCount);
+      } else {
+        setCount(target);
+      }
+    };
+    
+    requestAnimationFrame(updateCount);
   }, [isInView, target, duration]);
 
-  return <span ref={ref}>{count}</span>;
+  const displayValue = decimals > 0 
+    ? count.toFixed(decimals) 
+    : Math.floor(count).toLocaleString();
+
+  return <span ref={ref}>{displayValue}</span>;
 }
 
 export default function Home() {
@@ -619,15 +633,15 @@ export default function Home() {
         <div className="max-w-[1200px] mx-auto">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
             {[
-              { value: 12000, suffix: "+", label: "Ideas tracked" },
-              { value: 500, suffix: "+", label: "Teams using Briefix" },
-              { value: 87, suffix: "%", label: "Ideas shipped faster" },
-              { value: 4.9, suffix: "/5", label: "User rating" },
+              { value: 12847, suffix: "+", label: "Ideas tracked", decimals: 0 },
+              { value: 523, suffix: "+", label: "Teams using Briefix", decimals: 0 },
+              { value: 87, suffix: "%", label: "Ideas shipped faster", decimals: 0 },
+              { value: 4.9, suffix: "/5", label: "User rating", decimals: 1 },
             ].map((stat, i) => (
               <ScrollReveal key={i} delay={i * 0.1}>
                 <div className="text-center">
                   <div className="text-3xl md:text-4xl font-bold text-[var(--text-primary)]">
-                    <AnimatedCounter target={stat.value} />
+                    <AnimatedCounter target={stat.value} decimals={stat.decimals} />
                     {stat.suffix}
                   </div>
                   <div className="text-sm text-[var(--text-tertiary)] mt-1">{stat.label}</div>
