@@ -1,312 +1,100 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { motion, useInView, useScroll, useTransform, AnimatePresence } from "framer-motion";
-import {
-  DndContext,
-  DragOverlay,
-  closestCorners,
-  useSensor,
-  useSensors,
-  PointerSensor,
-  DragStartEvent,
-  DragEndEvent,
-} from "@dnd-kit/core";
-import {
-  SortableContext,
-  useSortable,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
-import WaitlistForm from "./components/WaitlistForm";
+import { motion, AnimatePresence, useScroll, useTransform } from "framer-motion";
+import Link from "next/link";
 
 // Types
-interface IdeaCard {
-  id: string;
-  title: string;
-  time: string;
-}
-
-interface KanbanColumn {
-  id: string;
-  title: string;
-  color?: string;
-  items: IdeaCard[];
-}
-
-// Typing animation words
-const typingWords = ["validated experiments", "shipped products", "team alignment", "real insights"];
-
-// Initial kanban data
-const initialColumns: KanbanColumn[] = [
-  { 
-    id: "inbox", 
-    title: "Inbox", 
-    items: [
-      { id: "1", title: "AI-powered search", time: "2d ago" },
-      { id: "2", title: "Mobile app v2", time: "2d ago" },
-      { id: "3", title: "API rate limiting", time: "3d ago" },
-    ] 
-  },
-  { 
-    id: "evaluating", 
-    title: "Evaluating", 
-    color: "var(--yellow)",
-    items: [
-      { id: "4", title: "Dashboard redesign", time: "1d ago" },
-      { id: "5", title: "Slack integration", time: "2d ago" },
-    ] 
-  },
-  { 
-    id: "experiment", 
-    title: "Experiment", 
-    color: "var(--accent)",
-    items: [
-      { id: "6", title: "Onboarding flow", time: "1d ago" },
-    ] 
-  },
-  { 
-    id: "shipped", 
-    title: "Shipped", 
-    color: "var(--green)",
-    items: [
-      { id: "7", title: "Dark mode", time: "5d ago" },
-      { id: "8", title: "Export to CSV", time: "1w ago" },
-    ] 
-  },
-];
-
-// Sortable Item Component
-function SortableItem({ item }: { item: IdeaCard }) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: item.id });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  };
-
-  return (
-    <motion.div
-      ref={setNodeRef}
-      style={style}
-      {...attributes}
-      {...listeners}
-      className="bg-[var(--bg-elevated)] rounded-lg p-3 border border-[var(--border)] hover:border-[var(--border-hover)] transition-all cursor-grab active:cursor-grabbing"
-      whileHover={{ scale: 1.02, y: -2 }}
-      whileTap={{ scale: 0.98 }}
-    >
-      <p className="text-sm text-[var(--text-primary)]">{item.title}</p>
-      <div className="flex items-center gap-2 mt-2">
-        <div className="w-4 h-4 rounded-full bg-[var(--accent)]/20" />
-        <span className="text-xs text-[var(--text-tertiary)]">{item.time}</span>
-      </div>
-    </motion.div>
-  );
-}
-
-// Droppable Column Component
-function DroppableColumn({ column }: { column: KanbanColumn }) {
-  const { setNodeRef } = useSortable({ id: column.id });
-
-  return (
-    <div ref={setNodeRef} className="space-y-3 min-h-[150px]">
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-medium text-[var(--text-secondary)]">{column.title}</span>
-        <span 
-          className="text-xs px-1.5 py-0.5 rounded"
-          style={{ 
-            color: column.color || "var(--text-tertiary)",
-            background: column.color ? `${column.color}15` : "var(--bg-hover)"
-          }}
-        >
-          {column.items.length}
-        </span>
-      </div>
-      <SortableContext items={column.items.map(i => i.id)} strategy={verticalListSortingStrategy}>
-        <div className="space-y-2">
-          {column.items.map((item) => (
-            <SortableItem key={item.id} item={item} />
-          ))}
-        </div>
-      </SortableContext>
-    </div>
-  );
-}
-
-// 3D Tilt Card Component
-function TiltCard({ children, className }: { children: React.ReactNode; className?: string }) {
-  const cardRef = useRef<HTMLDivElement>(null);
-  const [rotateX, setRotateX] = useState(0);
-  const [rotateY, setRotateY] = useState(0);
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!cardRef.current) return;
-    const rect = cardRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const centerX = rect.width / 2;
-    const centerY = rect.height / 2;
-    const rotateXVal = (y - centerY) / 10;
-    const rotateYVal = (centerX - x) / 10;
-    setRotateX(rotateXVal);
-    setRotateY(rotateYVal);
-  };
-
-  const handleMouseLeave = () => {
-    setRotateX(0);
-    setRotateY(0);
-  };
-
-  return (
-    <motion.div
-      ref={cardRef}
-      onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseLeave}
-      style={{
-        transform: `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`,
-        transformStyle: "preserve-3d",
-      }}
-      className={`transition-transform duration-100 ease-out ${className}`}
-    >
-      {children}
-    </motion.div>
-  );
-}
-
-// Interactive Slider Component
-function InteractiveSlider({ label, value, onChange, color }: { label: string; value: number; onChange: (v: number) => void; color: string }) {
-  return (
-    <div className="space-y-2">
-      <div className="flex justify-between text-sm">
-        <span className="text-[var(--text-secondary)]">{label}</span>
-        <span className="text-[var(--text-primary)] font-medium">{value}/10</span>
-      </div>
-      <div className="relative h-2 bg-[var(--bg-surface)] rounded-full overflow-hidden">
-        <motion.div 
-          className="absolute h-full rounded-full"
-          style={{ background: color, width: `${value * 10}%` }}
-          initial={{ width: 0 }}
-          animate={{ width: `${value * 10}%` }}
-          transition={{ duration: 0.3 }}
-        />
-      </div>
-      <input
-        type="range"
-        min="1"
-        max="10"
-        value={value}
-        onChange={(e) => onChange(parseInt(e.target.value))}
-        className="w-full opacity-0 absolute cursor-pointer"
-        style={{ height: "20px", top: "-4px" }}
-      />
-    </div>
-  );
-}
-
-// Scroll Animation Wrapper
-function ScrollReveal({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
-  const ref = useRef(null);
-  const isInView = useInView(ref, { once: true, margin: "-100px" });
-
-  return (
-    <motion.div
-      ref={ref}
-      initial={{ opacity: 0, y: 50 }}
-      animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 50 }}
-      transition={{ duration: 0.6, delay, ease: "easeOut" }}
-    >
-      {children}
-    </motion.div>
-  );
-}
-
-// Counter Component - using easing for smooth animation
-function AnimatedCounter({ target, duration = 2, decimals = 0 }: { target: number; duration?: number; decimals?: number }) {
-  const [count, setCount] = useState(0);
-  const ref = useRef(null);
-  const isInView = useInView(ref, { once: true });
-
-  useEffect(() => {
-    if (!isInView) return;
-    
-    const startTime = Date.now();
-    const endTime = startTime + duration * 1000;
-    
-    const easeOutQuart = (t: number) => 1 - Math.pow(1 - t, 4);
-    
-    const updateCount = () => {
-      const now = Date.now();
-      const progress = Math.min((now - startTime) / (duration * 1000), 1);
-      const easedProgress = easeOutQuart(progress);
-      const currentCount = easedProgress * target;
-      
-      setCount(currentCount);
-      
-      if (now < endTime) {
-        requestAnimationFrame(updateCount);
-      } else {
-        setCount(target);
-      }
-    };
-    
-    requestAnimationFrame(updateCount);
-  }, [isInView, target, duration]);
-
-  const displayValue = decimals > 0 
-    ? count.toFixed(decimals) 
-    : Math.floor(count).toLocaleString();
-
-  return <span ref={ref}>{displayValue}</span>;
-}
-
-// Playground Demo Component
 interface PlaygroundIdea {
   id: string;
   title: string;
-  scores: { market: number; effort: number; confidence: number };
+  scores: { impact: number; effort: number; confidence: number };
   totalScore: number;
-  status: "input" | "evaluating" | "prioritized" | "killed";
+  status: "active" | "killed";
   killReason?: string;
 }
 
-const killReasons = ["Too competitive", "Not enough time", "Lost interest", "Market changed", "Too risky"];
+const killReasons = [
+  "Too competitive",
+  "Not enough resources", 
+  "Lost conviction",
+  "Market timing off",
+  "Better alternatives exist"
+];
 
 const calculateScore = (scores: PlaygroundIdea["scores"]) => {
-  const { market, effort, confidence } = scores;
-  return Math.round(((market + (11 - effort) + confidence) / 30) * 100);
+  const { impact, effort, confidence } = scores;
+  // ICE Score: Impact * Confidence / Effort
+  return Math.round((impact * confidence) / Math.max(effort, 1) * 10);
 };
 
-function PlaygroundDemo() {
-  const [step, setStep] = useState<"input" | "evaluate" | "result">("input");
-  const [ideas, setIdeas] = useState<PlaygroundIdea[]>([]);
-  const [inputValues, setInputValues] = useState(["", "", ""]);
-  const [evalIndex, setEvalIndex] = useState(0);
-  const [showKillModal, setShowKillModal] = useState(false);
-  const [killingIdea, setKillingIdea] = useState<PlaygroundIdea | null>(null);
-  const [isKilling, setIsKilling] = useState(false);
+// Particle explosion for kill effect
+function KillParticles({ onComplete }: { onComplete: () => void }) {
+  useEffect(() => {
+    const timer = setTimeout(onComplete, 800);
+    return () => clearTimeout(timer);
+  }, [onComplete]);
 
+  return (
+    <div className="absolute inset-0 pointer-events-none overflow-hidden">
+      {[...Array(12)].map((_, i) => (
+        <motion.div
+          key={i}
+          className="absolute left-1/2 top-1/2 w-2 h-2 rounded-full"
+          style={{ 
+            background: i % 2 === 0 ? 'var(--red)' : 'var(--accent)',
+          }}
+          initial={{ x: 0, y: 0, opacity: 1, scale: 1 }}
+          animate={{ 
+            x: (Math.random() - 0.5) * 200,
+            y: (Math.random() - 0.5) * 200,
+            opacity: 0,
+            scale: 0
+          }}
+          transition={{ duration: 0.6, ease: "easeOut" }}
+        />
+      ))}
+    </div>
+  );
+}
+
+export default function LandingPage() {
+  const [step, setStep] = useState<"idle" | "input" | "evaluate" | "result">("idle");
+  const [ideas, setIdeas] = useState<PlaygroundIdea[]>([]);
+  const [inputs, setInputs] = useState(["", "", ""]);
+  const [evalIndex, setEvalIndex] = useState(0);
+  const [killingIdea, setKillingIdea] = useState<PlaygroundIdea | null>(null);
+  const [showKillModal, setShowKillModal] = useState(false);
+  const [isKilling, setIsKilling] = useState(false);
+  const [email, setEmail] = useState("");
+  const [emailStatus, setEmailStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  
+  const playgroundRef = useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll();
+  const heroOpacity = useTransform(scrollYProgress, [0, 0.15], [1, 0]);
+
+  // Scroll to playground
+  const scrollToPlayground = () => {
+    playgroundRef.current?.scrollIntoView({ behavior: "smooth" });
+    setTimeout(() => setStep("input"), 500);
+  };
+
+  // Submit ideas
   const submitIdeas = () => {
-    const valid = inputValues.filter(v => v.trim()).map((title, i) => ({
-      id: `pg-${i}`,
+    const valid = inputs.filter(v => v.trim()).map((title, i) => ({
+      id: `idea-${i}`,
       title: title.trim(),
-      scores: { market: 5, effort: 5, confidence: 5 },
+      scores: { impact: 5, effort: 5, confidence: 5 },
       totalScore: 50,
-      status: "input" as const,
+      status: "active" as const,
     }));
     if (valid.length === 0) return;
     setIdeas(valid);
     setStep("evaluate");
   };
 
-  const updateScore = (field: "market" | "effort" | "confidence", value: number) => {
+  // Update score
+  const updateScore = (field: keyof PlaygroundIdea["scores"], value: number) => {
     setIdeas(prev => prev.map((idea, i) => {
       if (i !== evalIndex) return idea;
       const newScores = { ...idea.scores, [field]: value };
@@ -314,232 +102,570 @@ function PlaygroundDemo() {
     }));
   };
 
+  // Next evaluation
   const nextEval = () => {
     if (evalIndex < ideas.length - 1) {
       setEvalIndex(prev => prev + 1);
     } else {
-      setIdeas(prev => [...prev].sort((a, b) => b.totalScore - a.totalScore).map((idea, i) => ({
-        ...idea,
-        status: i === 0 ? "prioritized" : i === prev.length - 1 ? "input" : "evaluating",
-      })));
+      setIdeas(prev => [...prev].sort((a, b) => b.totalScore - a.totalScore));
       setStep("result");
     }
   };
 
+  // Kill idea
   const handleKill = (reason: string) => {
     if (!killingIdea) return;
     setIsKilling(true);
-    setTimeout(() => {
-      setIdeas(prev => prev.map(idea => 
-        idea.id === killingIdea.id ? { ...idea, status: "killed", killReason: reason } : idea
-      ));
-      setShowKillModal(false);
-      setKillingIdea(null);
-      setIsKilling(false);
-    }, 600);
   };
 
+  const completeKill = () => {
+    if (!killingIdea) return;
+    setIdeas(prev => prev.map(idea => 
+      idea.id === killingIdea.id ? { ...idea, status: "killed", killReason: killingIdea.killReason } : idea
+    ));
+    setShowKillModal(false);
+    setKillingIdea(null);
+    setIsKilling(false);
+  };
+
+  // Submit email
+  const handleEmailSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !email.includes("@")) return;
+    
+    setEmailStatus("loading");
+    try {
+      const res = await fetch("/api/waitlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      if (res.ok) {
+        setEmailStatus("success");
+      } else {
+        setEmailStatus("error");
+      }
+    } catch {
+      setEmailStatus("error");
+    }
+  };
+
+  // Reset
   const reset = () => {
-    setStep("input");
+    setStep("idle");
     setIdeas([]);
-    setInputValues(["", "", ""]);
+    setInputs(["", "", ""]);
     setEvalIndex(0);
+    setEmail("");
+    setEmailStatus("idle");
   };
 
   return (
-    <div className="card overflow-hidden">
-      {/* Step indicator */}
-      <div className="flex border-b border-[var(--border)]">
-        {["Add Ideas", "Evaluate", "Results"].map((label, i) => (
-          <div 
-            key={label}
-            className={`flex-1 py-3 text-center text-sm font-medium transition-colors ${
-              i === (step === "input" ? 0 : step === "evaluate" ? 1 : 2)
-                ? "bg-[var(--accent)]/10 text-[var(--accent)] border-b-2 border-[var(--accent)]"
-                : "text-[var(--text-tertiary)]"
-            }`}
-          >
-            {label}
-          </div>
-        ))}
+    <div className="min-h-screen bg-[var(--bg-page)]">
+      {/* Subtle gradient background */}
+      <div className="fixed inset-0 pointer-events-none">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] bg-[var(--accent)] opacity-[0.03] blur-[120px] rounded-full" />
       </div>
 
-      <div className="p-6">
-        <AnimatePresence mode="wait">
-          {/* INPUT STEP */}
-          {step === "input" && (
-            <motion.div
-              key="input"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-4"
-            >
-              <p className="text-sm text-[var(--text-secondary)] mb-4">
-                What ideas have you been thinking about? Add up to 3.
-              </p>
-              {inputValues.map((val, i) => (
-                <div key={i} className="flex items-center gap-3">
-                  <span className="text-[var(--text-tertiary)] text-sm w-6">{i + 1}.</span>
-                  <input
-                    type="text"
-                    value={val}
-                    onChange={(e) => {
-                      const newVals = [...inputValues];
-                      newVals[i] = e.target.value;
-                      setInputValues(newVals);
-                    }}
-                    placeholder={i === 0 ? "e.g., Launch a newsletter" : i === 1 ? "e.g., Build an AI tool" : "e.g., Mobile app idea"}
-                    className="input flex-1"
-                  />
-                </div>
-              ))}
-              <button
-                onClick={submitIdeas}
-                disabled={!inputValues.some(v => v.trim())}
-                className="btn-primary w-full mt-4 disabled:opacity-50"
-              >
-                Start Evaluating →
-              </button>
-            </motion.div>
-          )}
+      {/* Header */}
+      <motion.header 
+        style={{ opacity: heroOpacity }}
+        className="fixed top-0 left-0 right-0 z-50"
+      >
+        <div className="max-w-[1100px] mx-auto px-6 py-4 flex items-center justify-between">
+          <Link href="/" className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[var(--accent)] to-[var(--purple)] flex items-center justify-center">
+              <span className="text-white font-bold text-sm">B</span>
+            </div>
+            <span className="font-semibold text-[var(--text-primary)] text-lg">Briefix</span>
+          </Link>
+          <div className="flex items-center gap-4">
+            <Link href="/login" className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
+              Log in
+            </Link>
+            <Link href="/signup" className="btn-primary text-sm py-2 px-4">
+              Get started
+            </Link>
+          </div>
+        </div>
+      </motion.header>
 
-          {/* EVALUATE STEP */}
-          {step === "evaluate" && ideas[evalIndex] && (
-            <motion.div
-              key={`eval-${evalIndex}`}
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-            >
-              <div className="text-center mb-6">
-                <p className="text-xs text-[var(--text-tertiary)] mb-1">
-                  Idea {evalIndex + 1} of {ideas.length}
-                </p>
-                <h3 className="text-lg font-semibold text-[var(--text-primary)]">
-                  "{ideas[evalIndex].title}"
-                </h3>
-              </div>
+      {/* Hero Section */}
+      <section className="min-h-screen flex flex-col items-center justify-center px-6 pt-20 pb-32 relative">
+        <motion.div 
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8 }}
+          className="text-center max-w-3xl mx-auto"
+        >
+          {/* Badge */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.2 }}
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--accent)]/10 border border-[var(--accent)]/20 mb-8"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-pulse" />
+            <span className="text-xs font-medium text-[var(--accent)]">Now in private beta</span>
+          </motion.div>
 
-              <div className="space-y-5">
-                {[
-                  { key: "market", label: "Market Opportunity", low: "Niche", high: "Huge market" },
-                  { key: "effort", label: "Effort Required", low: "Easy", high: "Very hard" },
-                  { key: "confidence", label: "Your Confidence", low: "Low", high: "High" },
-                ].map(({ key, label, low, high }) => (
-                  <div key={key}>
-                    <div className="flex justify-between text-sm mb-2">
-                      <span className="text-[var(--text-secondary)]">{label}</span>
-                      <span className="text-[var(--text-primary)] font-medium">
-                        {ideas[evalIndex].scores[key as keyof typeof ideas[0]["scores"]]}/10
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      min="1"
-                      max="10"
-                      value={ideas[evalIndex].scores[key as keyof typeof ideas[0]["scores"]]}
-                      onChange={(e) => updateScore(key as "market" | "effort" | "confidence", parseInt(e.target.value))}
-                      className="w-full accent-[var(--accent)]"
-                    />
-                    <div className="flex justify-between text-xs text-[var(--text-tertiary)] mt-1">
-                      <span>{low}</span>
-                      <span>{high}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+          {/* Headline */}
+          <h1 className="text-5xl md:text-7xl font-bold text-[var(--text-primary)] leading-[1.1] tracking-tight mb-6">
+            Your ideas deserve
+            <br />
+            <span className="gradient-text">better than Notion</span>
+          </h1>
+          
+          <p className="text-lg md:text-xl text-[var(--text-secondary)] leading-relaxed mb-10 max-w-xl mx-auto">
+            Stop losing ideas in endless docs. Evaluate, prioritize, and ship—or kill them with conviction.
+          </p>
 
-              <div className="mt-6 p-4 bg-[var(--bg-elevated)] rounded-lg text-center">
-                <div className="text-2xl font-bold text-[var(--accent)]">
-                  {ideas[evalIndex].totalScore}%
-                </div>
-                <div className="text-sm text-[var(--text-secondary)]">
-                  {ideas[evalIndex].totalScore >= 70 ? "🔥 High potential!" : ideas[evalIndex].totalScore >= 50 ? "🤔 Worth exploring" : "⚠️ Needs thought"}
-                </div>
-              </div>
+          {/* CTA */}
+          <motion.button
+            onClick={scrollToPlayground}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className="group inline-flex items-center gap-3 bg-[var(--text-primary)] text-[var(--bg-page)] font-semibold text-lg px-8 py-4 rounded-xl hover:bg-white transition-colors"
+          >
+            Try it with your ideas
+            <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+            </svg>
+          </motion.button>
 
-              <button onClick={nextEval} className="btn-primary w-full mt-4">
-                {evalIndex < ideas.length - 1 ? "Next Idea →" : "See Results →"}
-              </button>
-            </motion.div>
-          )}
+          <p className="mt-4 text-sm text-[var(--text-tertiary)]">
+            No signup required. Experience it first.
+          </p>
+        </motion.div>
 
-          {/* RESULT STEP */}
-          {step === "result" && (
-            <motion.div
-              key="result"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-            >
-              <div className="text-center mb-6">
-                <div className="text-3xl mb-2">🎯</div>
-                <h3 className="text-lg font-semibold text-[var(--text-primary)]">
-                  Your Prioritized Ideas
-                </h3>
-              </div>
+        {/* Scroll indicator */}
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1 }}
+          className="absolute bottom-12 left-1/2 -translate-x-1/2"
+        >
+          <motion.div 
+            animate={{ y: [0, 8, 0] }}
+            transition={{ duration: 1.5, repeat: Infinity }}
+            className="w-6 h-10 rounded-full border-2 border-[var(--text-tertiary)] flex items-start justify-center p-2"
+          >
+            <div className="w-1 h-2 rounded-full bg-[var(--text-tertiary)]" />
+          </motion.div>
+        </motion.div>
+      </section>
 
-              <div className="space-y-3">
-                {ideas.map((idea, i) => (
-                  <motion.div
-                    key={idea.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: idea.status === "killed" ? 0.5 : 1, y: 0 }}
-                    transition={{ delay: i * 0.1 }}
-                    className={`p-4 rounded-lg border transition-all ${
-                      idea.status === "killed" 
-                        ? "border-red-500/30 bg-red-500/5" 
-                        : i === 0 
-                          ? "border-[var(--green)] bg-[var(--green)]/5" 
-                          : "border-[var(--border)] bg-[var(--bg-elevated)]"
+      {/* Playground Section */}
+      <section ref={playgroundRef} className="py-24 px-6">
+        <div className="max-w-2xl mx-auto">
+          {/* Section Header */}
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="text-center mb-12"
+          >
+            <p className="section-label">Interactive Demo</p>
+            <h2 className="text-3xl md:text-4xl font-bold text-[var(--text-primary)] mt-2">
+              See how it works
+            </h2>
+          </motion.div>
+
+          {/* Playground Card */}
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="card overflow-hidden"
+          >
+            {/* Progress Steps */}
+            <div className="flex border-b border-[var(--border)]">
+              {[
+                { key: "input", label: "Add Ideas", num: "1" },
+                { key: "evaluate", label: "Evaluate", num: "2" },
+                { key: "result", label: "Decide", num: "3" },
+              ].map((s, i) => {
+                const isActive = 
+                  (s.key === "input" && step === "input") ||
+                  (s.key === "evaluate" && step === "evaluate") ||
+                  (s.key === "result" && step === "result");
+                const isPast = 
+                  (s.key === "input" && (step === "evaluate" || step === "result")) ||
+                  (s.key === "evaluate" && step === "result");
+                
+                return (
+                  <div 
+                    key={s.key}
+                    className={`flex-1 py-4 text-center text-sm font-medium transition-all relative ${
+                      isActive 
+                        ? "text-[var(--text-primary)]" 
+                        : isPast 
+                          ? "text-[var(--accent)]"
+                          : "text-[var(--text-tertiary)]"
                     }`}
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <span className="text-lg">
-                          {idea.status === "killed" ? "💀" : i === 0 ? "🥇" : i === 1 ? "🥈" : "🥉"}
-                        </span>
-                        <div>
-                          <div className={`font-medium ${idea.status === "killed" ? "line-through text-[var(--text-tertiary)]" : "text-[var(--text-primary)]"}`}>
-                            {idea.title}
+                    <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-xs mr-2 ${
+                      isActive 
+                        ? "bg-[var(--accent)] text-white" 
+                        : isPast 
+                          ? "bg-[var(--accent)]/20 text-[var(--accent)]"
+                          : "bg-[var(--bg-surface)] text-[var(--text-tertiary)]"
+                    }`}>
+                      {isPast ? "✓" : s.num}
+                    </span>
+                    {s.label}
+                    {isActive && (
+                      <motion.div 
+                        layoutId="activeStep"
+                        className="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--accent)]" 
+                      />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="p-8">
+              <AnimatePresence mode="wait">
+                {/* IDLE STATE */}
+                {step === "idle" && (
+                  <motion.div
+                    key="idle"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="text-center py-12"
+                  >
+                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[var(--accent)]/20 to-[var(--purple)]/20 flex items-center justify-center mx-auto mb-6">
+                      <svg className="w-8 h-8 text-[var(--accent)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                      </svg>
+                    </div>
+                    <h3 className="text-xl font-semibold text-[var(--text-primary)] mb-2">
+                      Ready to prioritize?
+                    </h3>
+                    <p className="text-[var(--text-secondary)] mb-6">
+                      Add your ideas and see which ones are worth pursuing.
+                    </p>
+                    <button onClick={() => setStep("input")} className="btn-primary">
+                      Start →
+                    </button>
+                  </motion.div>
+                )}
+
+                {/* INPUT STATE */}
+                {step === "input" && (
+                  <motion.div
+                    key="input"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                  >
+                    <p className="text-[var(--text-secondary)] mb-6">
+                      What ideas have been on your mind? Add up to 3.
+                    </p>
+                    <div className="space-y-3">
+                      {inputs.map((val, i) => (
+                        <div key={i} className="relative">
+                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] text-sm font-medium">
+                            {i + 1}.
+                          </span>
+                          <input
+                            type="text"
+                            value={val}
+                            onChange={(e) => {
+                              const newInputs = [...inputs];
+                              newInputs[i] = e.target.value;
+                              setInputs(newInputs);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" && inputs.some(v => v.trim())) {
+                                submitIdeas();
+                              }
+                            }}
+                            placeholder={
+                              i === 0 ? "e.g., Launch a weekly newsletter" 
+                              : i === 1 ? "e.g., Build an AI assistant" 
+                              : "e.g., Create a mobile app"
+                            }
+                            className="input pl-10"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    <button
+                      onClick={submitIdeas}
+                      disabled={!inputs.some(v => v.trim())}
+                      className="btn-primary w-full mt-6 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      Continue
+                    </button>
+                  </motion.div>
+                )}
+
+                {/* EVALUATE STATE */}
+                {step === "evaluate" && ideas[evalIndex] && (
+                  <motion.div
+                    key={`eval-${evalIndex}`}
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                  >
+                    <div className="text-center mb-8">
+                      <p className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider mb-2">
+                        Idea {evalIndex + 1} of {ideas.length}
+                      </p>
+                      <h3 className="text-xl font-semibold text-[var(--text-primary)]">
+                        {ideas[evalIndex].title}
+                      </h3>
+                    </div>
+
+                    <div className="space-y-6">
+                      {[
+                        { key: "impact", label: "Impact", desc: "How big is the potential?" },
+                        { key: "effort", label: "Effort", desc: "How hard to execute?" },
+                        { key: "confidence", label: "Confidence", desc: "How sure are you?" },
+                      ].map(({ key, label, desc }) => (
+                        <div key={key}>
+                          <div className="flex justify-between items-baseline mb-3">
+                            <div>
+                              <span className="text-sm font-medium text-[var(--text-primary)]">{label}</span>
+                              <span className="text-xs text-[var(--text-tertiary)] ml-2">{desc}</span>
+                            </div>
+                            <span className="text-lg font-semibold text-[var(--accent)]">
+                              {ideas[evalIndex].scores[key as keyof typeof ideas[0]["scores"]]}
+                            </span>
                           </div>
-                          <div className="text-xs text-[var(--text-tertiary)]">
-                            {idea.status === "killed" ? idea.killReason : `Score: ${idea.totalScore}%`}
+                          <input
+                            type="range"
+                            min="1"
+                            max="10"
+                            value={ideas[evalIndex].scores[key as keyof typeof ideas[0]["scores"]]}
+                            onChange={(e) => updateScore(key as keyof PlaygroundIdea["scores"], parseInt(e.target.value))}
+                            className="w-full h-2 bg-[var(--bg-surface)] rounded-full appearance-none cursor-pointer accent-[var(--accent)]"
+                          />
+                          <div className="flex justify-between text-xs text-[var(--text-tertiary)] mt-1">
+                            <span>Low</span>
+                            <span>High</span>
                           </div>
                         </div>
+                      ))}
+                    </div>
+
+                    {/* Score Preview */}
+                    <div className="mt-8 p-4 rounded-xl bg-[var(--bg-surface)] text-center">
+                      <div className="text-3xl font-bold gradient-text">
+                        {ideas[evalIndex].totalScore}
                       </div>
-                      {idea.status !== "killed" && i === ideas.filter(x => x.status !== "killed").length - 1 && ideas.filter(x => x.status !== "killed").length > 1 && (
-                        <button
-                          onClick={() => { setKillingIdea(idea); setShowKillModal(true); }}
-                          className="text-xs text-red-400 hover:text-red-300 px-2 py-1 rounded hover:bg-red-500/10 transition-colors"
+                      <div className="text-sm text-[var(--text-secondary)] mt-1">
+                        ICE Score
+                      </div>
+                    </div>
+
+                    <button onClick={nextEval} className="btn-primary w-full mt-6">
+                      {evalIndex < ideas.length - 1 ? "Next Idea" : "See Results"}
+                    </button>
+                  </motion.div>
+                )}
+
+                {/* RESULT STATE */}
+                {step === "result" && (
+                  <motion.div
+                    key="result"
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                  >
+                    <div className="text-center mb-8">
+                      <div className="text-4xl mb-3">🎯</div>
+                      <h3 className="text-xl font-semibold text-[var(--text-primary)]">
+                        Your Priority Stack
+                      </h3>
+                    </div>
+
+                    <div className="space-y-3">
+                      {ideas.map((idea, i) => {
+                        const isKilled = idea.status === "killed";
+                        const isWinner = i === 0 && !isKilled;
+                        const isLowest = i === ideas.filter(x => x.status === "active").length - 1 && 
+                                        ideas.filter(x => x.status === "active").length > 1 &&
+                                        !isKilled;
+                        
+                        return (
+                          <motion.div
+                            key={idea.id}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: isKilled ? 0.5 : 1, y: 0 }}
+                            transition={{ delay: i * 0.1 }}
+                            className={`p-4 rounded-xl border transition-all relative overflow-hidden ${
+                              isKilled 
+                                ? "border-[var(--red)]/30 bg-[var(--red)]/5" 
+                                : isWinner 
+                                  ? "border-[var(--green)]/50 bg-[var(--green)]/5" 
+                                  : "border-[var(--border)] bg-[var(--bg-surface)]"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <span className="text-xl">
+                                  {isKilled ? "💀" : isWinner ? "🏆" : i === 1 ? "🥈" : "🥉"}
+                                </span>
+                                <div>
+                                  <div className={`font-medium ${isKilled ? "line-through text-[var(--text-tertiary)]" : "text-[var(--text-primary)]"}`}>
+                                    {idea.title}
+                                  </div>
+                                  <div className="text-xs text-[var(--text-tertiary)]">
+                                    {isKilled ? idea.killReason : `Score: ${idea.totalScore}`}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {isWinner && !isKilled && (
+                                  <span className="text-xs font-medium text-[var(--green)] px-2 py-1 rounded-full bg-[var(--green)]/10">
+                                    Ship it!
+                                  </span>
+                                )}
+                                {isLowest && (
+                                  <button
+                                    onClick={() => { setKillingIdea(idea); setShowKillModal(true); }}
+                                    className="text-xs text-[var(--red)] hover:bg-[var(--red)]/10 px-2 py-1 rounded-lg transition-colors"
+                                  >
+                                    Kill
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </motion.div>
+                        );
+                      })}
+                    </div>
+
+                    {/* CTA */}
+                    <div className="mt-10 pt-8 border-t border-[var(--border)]">
+                      {emailStatus === "success" ? (
+                        <motion.div 
+                          initial={{ opacity: 0, scale: 0.9 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          className="text-center"
                         >
-                          Kill 💀
-                        </button>
-                      )}
-                      {i === 0 && idea.status !== "killed" && (
-                        <span className="text-xs text-[var(--green)]">Start here!</span>
+                          <div className="w-12 h-12 rounded-full bg-[var(--green)]/10 flex items-center justify-center mx-auto mb-4">
+                            <svg className="w-6 h-6 text-[var(--green)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          </div>
+                          <h4 className="text-lg font-semibold text-[var(--text-primary)] mb-1">You're on the list!</h4>
+                          <p className="text-sm text-[var(--text-secondary)]">We'll reach out when your spot is ready.</p>
+                        </motion.div>
+                      ) : (
+                        <>
+                          <h4 className="text-lg font-semibold text-[var(--text-primary)] text-center mb-2">
+                            Want to save this?
+                          </h4>
+                          <p className="text-sm text-[var(--text-secondary)] text-center mb-6">
+                            Get early access and keep your priority stack.
+                          </p>
+                          <form onSubmit={handleEmailSubmit} className="flex gap-2">
+                            <input
+                              type="email"
+                              value={email}
+                              onChange={(e) => setEmail(e.target.value)}
+                              placeholder="you@company.com"
+                              className="input flex-1"
+                              disabled={emailStatus === "loading"}
+                            />
+                            <button 
+                              type="submit" 
+                              className="btn-primary whitespace-nowrap"
+                              disabled={emailStatus === "loading"}
+                            >
+                              {emailStatus === "loading" ? "..." : "Get Access"}
+                            </button>
+                          </form>
+                          {emailStatus === "error" && (
+                            <p className="text-xs text-[var(--red)] mt-2 text-center">Something went wrong. Try again.</p>
+                          )}
+                        </>
                       )}
                     </div>
+
+                    <button 
+                      onClick={reset}
+                      className="w-full mt-6 text-sm text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors"
+                    >
+                      ← Try with different ideas
+                    </button>
                   </motion.div>
-                ))}
-              </div>
+                )}
+              </AnimatePresence>
+            </div>
+          </motion.div>
+        </div>
+      </section>
 
-              <div className="mt-6 p-4 bg-[var(--bg-elevated)] rounded-lg text-center">
-                <p className="text-sm text-[var(--text-secondary)] mb-3">
-                  Ready to track your ideas for real?
-                </p>
-                <a href="#waitlist" className="btn-primary inline-block">
-                  Get Early Access
-                </a>
-              </div>
+      {/* Built For Section */}
+      <section className="py-24 px-6 border-t border-[var(--border)]">
+        <div className="max-w-4xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="text-center mb-16"
+          >
+            <p className="section-label">Built for</p>
+            <h2 className="text-3xl md:text-4xl font-bold text-[var(--text-primary)] mt-2">
+              Teams that move fast
+            </h2>
+          </motion.div>
 
-              <button onClick={reset} className="w-full mt-3 text-sm text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]">
-                ← Try with different ideas
-              </button>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+          <div className="grid md:grid-cols-3 gap-6">
+            {[
+              {
+                icon: "🚀",
+                title: "Startup founders",
+                desc: "Turn 100 ideas into 1 validated experiment"
+              },
+              {
+                icon: "💡",
+                title: "Product teams",
+                desc: "Prioritize features with data, not opinions"
+              },
+              {
+                icon: "🎯",
+                title: "Solo builders",
+                desc: "Stop second-guessing, start shipping"
+              }
+            ].map((item, i) => (
+              <motion.div
+                key={item.title}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.1 }}
+                className="text-center p-6"
+              >
+                <div className="text-4xl mb-4">{item.icon}</div>
+                <h3 className="font-semibold text-[var(--text-primary)] mb-2">{item.title}</h3>
+                <p className="text-sm text-[var(--text-secondary)]">{item.desc}</p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="py-8 px-6 border-t border-[var(--border)]">
+        <div className="max-w-4xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-md bg-gradient-to-br from-[var(--accent)] to-[var(--purple)] flex items-center justify-center">
+              <span className="text-white font-bold text-xs">B</span>
+            </div>
+            <span className="text-sm text-[var(--text-tertiary)]">© 2025 Briefix</span>
+          </div>
+          <div className="flex items-center gap-6 text-sm text-[var(--text-tertiary)]">
+            <Link href="/login" className="hover:text-[var(--text-secondary)] transition-colors">Log in</Link>
+            <Link href="/signup" className="hover:text-[var(--text-secondary)] transition-colors">Sign up</Link>
+          </div>
+        </div>
+      </footer>
 
       {/* Kill Modal */}
       <AnimatePresence>
@@ -548,874 +674,75 @@ function PlaygroundDemo() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
             onClick={() => !isKilling && setShowKillModal(false)}
           >
             <motion.div
-              initial={{ scale: 0.9 }}
-              animate={{ scale: isKilling ? 0.8 : 1 }}
-              exit={{ scale: 0.9 }}
-              className={`card p-6 w-full max-w-sm transition-opacity ${isKilling ? "opacity-0" : ""}`}
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="card p-6 w-full max-w-sm relative"
               onClick={(e) => e.stopPropagation()}
             >
-              {isKilling ? (
-                <div className="text-center py-8">
-                  <motion.div
-                    animate={{ rotate: 360, scale: [1, 0] }}
-                    transition={{ duration: 0.5 }}
-                    className="text-4xl"
-                  >
-                    💀
-                  </motion.div>
-                </div>
-              ) : (
-                <>
-                  <div className="text-center mb-4">
-                    <div className="text-3xl mb-2">💀</div>
-                    <h3 className="font-semibold text-[var(--text-primary)]">
-                      Kill "{killingIdea.title}"?
-                    </h3>
-                    <p className="text-sm text-[var(--text-secondary)]">
+              {isKilling && <KillParticles onComplete={completeKill} />}
+              
+              <AnimatePresence mode="wait">
+                {!isKilling ? (
+                  <motion.div key="modal" exit={{ opacity: 0, scale: 0.8 }}>
+                    <div className="text-center mb-6">
+                      <div className="text-4xl mb-3">💀</div>
+                      <h3 className="text-lg font-semibold text-[var(--text-primary)]">
+                        Kill this idea?
+                      </h3>
+                      <p className="text-sm text-[var(--text-secondary)] mt-1">
+                        {killingIdea.title}
+                      </p>
+                    </div>
+                    <p className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider mb-3">
                       Select a reason
                     </p>
-                  </div>
-                  <div className="space-y-2">
-                    {killReasons.map((reason) => (
-                      <button
-                        key={reason}
-                        onClick={() => handleKill(reason)}
-                        className="w-full p-3 text-left rounded-lg border border-[var(--border)] hover:border-red-500/50 hover:bg-red-500/5 transition-colors text-sm text-[var(--text-secondary)]"
-                      >
-                        {reason}
-                      </button>
-                    ))}
-                  </div>
-                  <button
-                    onClick={() => setShowKillModal(false)}
-                    className="w-full mt-3 text-sm text-[var(--text-tertiary)]"
+                    <div className="space-y-2">
+                      {killReasons.map((reason) => (
+                        <button
+                          key={reason}
+                          onClick={() => {
+                            setKillingIdea({ ...killingIdea, killReason: reason });
+                            handleKill(reason);
+                          }}
+                          className="w-full p-3 text-left rounded-lg border border-[var(--border)] hover:border-[var(--red)]/50 hover:bg-[var(--red)]/5 transition-all text-sm text-[var(--text-secondary)]"
+                        >
+                          {reason}
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      onClick={() => setShowKillModal(false)}
+                      className="w-full mt-4 text-sm text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
+                    >
+                      Cancel
+                    </button>
+                  </motion.div>
+                ) : (
+                  <motion.div 
+                    key="killing"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="py-12 text-center"
                   >
-                    Cancel
-                  </button>
-                </>
-              )}
+                    <motion.div
+                      animate={{ scale: [1, 1.2, 0], rotate: [0, 10, -10, 0] }}
+                      transition={{ duration: 0.5 }}
+                      className="text-5xl"
+                    >
+                      💀
+                    </motion.div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
-  );
-}
-
-export default function Home() {
-  // Mouse follower state
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
-  const [isClient, setIsClient] = useState(false);
-
-  // Typing animation state
-  const [currentWordIndex, setCurrentWordIndex] = useState(0);
-  const [displayText, setDisplayText] = useState("");
-  const [isDeleting, setIsDeleting] = useState(false);
-
-  // Kanban state
-  const [columns, setColumns] = useState(initialColumns);
-  const [activeId, setActiveId] = useState<string | null>(null);
-
-  // Evaluation slider state
-  const [scores, setScores] = useState({ market: 7, effort: 5, team: 8 });
-
-  // How it works state
-  const [activeStep, setActiveStep] = useState(0);
-
-  // Scroll progress
-  const { scrollYProgress } = useScroll();
-  const headerOpacity = useTransform(scrollYProgress, [0, 0.1], [1, 0.9]);
-
-  // DnD sensors
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: { distance: 8 },
-    })
-  );
-
-  // Client-side only
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
-
-  // Mouse follower effect
-  useEffect(() => {
-    if (!isClient) return;
-    
-    const handleMouseMove = (e: MouseEvent) => {
-      setMousePosition({ x: e.clientX, y: e.clientY });
-    };
-
-    window.addEventListener("mousemove", handleMouseMove);
-    return () => window.removeEventListener("mousemove", handleMouseMove);
-  }, [isClient]);
-
-  // Typing animation effect
-  useEffect(() => {
-    const currentWord = typingWords[currentWordIndex];
-    
-    const timeout = setTimeout(() => {
-      if (!isDeleting) {
-        if (displayText.length < currentWord.length) {
-          setDisplayText(currentWord.slice(0, displayText.length + 1));
-        } else {
-          setTimeout(() => setIsDeleting(true), 2000);
-        }
-      } else {
-        if (displayText.length > 0) {
-          setDisplayText(displayText.slice(0, -1));
-        } else {
-          setIsDeleting(false);
-          setCurrentWordIndex((prev) => (prev + 1) % typingWords.length);
-        }
-      }
-    }, isDeleting ? 50 : 100);
-
-    return () => clearTimeout(timeout);
-  }, [displayText, isDeleting, currentWordIndex]);
-
-  // Auto-rotate How it works
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setActiveStep((prev) => (prev + 1) % 3);
-    }, 4000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // DnD handlers
-  const handleDragStart = (event: DragStartEvent) => {
-    setActiveId(event.active.id as string);
-  };
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    setActiveId(null);
-    
-    if (!over) return;
-    
-    const activeColumn = columns.find(col => col.items.some(item => item.id === active.id));
-    const overColumn = columns.find(col => col.id === over.id || col.items.some(item => item.id === over.id));
-    
-    if (!activeColumn || !overColumn) return;
-    if (activeColumn.id === overColumn.id) return;
-
-    const activeItem = activeColumn.items.find(item => item.id === active.id);
-    if (!activeItem) return;
-
-    setColumns(prev => prev.map(col => {
-      if (col.id === activeColumn.id) {
-        return { ...col, items: col.items.filter(item => item.id !== active.id) };
-      }
-      if (col.id === overColumn.id) {
-        return { ...col, items: [...col.items, activeItem] };
-      }
-      return col;
-    }));
-  };
-
-  const activeItem = activeId ? columns.flatMap(c => c.items).find(i => i.id === activeId) : null;
-
-  const howItWorksSteps = [
-    {
-      step: "01",
-      title: "Collect",
-      desc: "Drop ideas into the inbox from Slack, email, or web. AI automatically tags and summarizes each idea.",
-      visual: (
-        <div className="bg-[var(--bg-surface)] rounded-xl p-4 border border-[var(--border)]">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-8 h-8 rounded-lg bg-[var(--accent)]/20 flex items-center justify-center">
-              <svg className="w-4 h-4 text-[var(--accent)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-              </svg>
-            </div>
-            <span className="text-sm text-[var(--text-secondary)]">New idea captured</span>
-          </div>
-          <div className="space-y-2">
-            {["AI-powered search feature", "Mobile app redesign"].map((idea, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: i * 0.2 }}
-                className="bg-[var(--bg-elevated)] rounded-lg p-3 border border-[var(--border)]"
-              >
-                <p className="text-sm text-[var(--text-primary)]">{idea}</p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      ),
-    },
-    {
-      step: "02",
-      title: "Evaluate",
-      desc: "Team members score ideas on market fit, effort, and team alignment. Top ideas rise to the surface automatically.",
-      visual: (
-        <div className="bg-[var(--bg-surface)] rounded-xl p-4 border border-[var(--border)] space-y-4">
-          <div className="text-sm text-[var(--text-secondary)] mb-2">Rate this idea:</div>
-          {[
-            { label: "Market Fit", value: 8, color: "var(--green)" },
-            { label: "Effort", value: 4, color: "var(--yellow)" },
-            { label: "Team Fit", value: 9, color: "var(--accent)" },
-          ].map((item, i) => (
-            <div key={i} className="space-y-1">
-              <div className="flex justify-between text-xs">
-                <span className="text-[var(--text-tertiary)]">{item.label}</span>
-                <span className="text-[var(--text-primary)]">{item.value}/10</span>
-              </div>
-              <div className="h-1.5 bg-[var(--bg-hover)] rounded-full overflow-hidden">
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: `${item.value * 10}%` }}
-                  transition={{ duration: 0.8, delay: i * 0.2 }}
-                  className="h-full rounded-full"
-                  style={{ background: item.color }}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-      ),
-    },
-    {
-      step: "03",
-      title: "Experiment",
-      desc: "Run small tests on winning ideas. Ship or kill—either way, you learn and document the outcome.",
-      visual: (
-        <div className="bg-[var(--bg-surface)] rounded-xl p-4 border border-[var(--border)]">
-          <div className="flex items-center justify-between mb-4">
-            <span className="text-sm text-[var(--text-secondary)]">Experiment Progress</span>
-            <span className="text-xs px-2 py-0.5 bg-[var(--green)]/10 text-[var(--green)] rounded-full">Active</span>
-          </div>
-          <div className="space-y-3">
-            {["Research", "Build MVP", "Ship & Measure"].map((phase, i) => (
-              <div key={i} className="flex items-center gap-3">
-                <motion.div
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ delay: i * 0.3 }}
-                  className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${
-                    i < 2 ? "bg-[var(--green)] text-white" : "bg-[var(--bg-hover)] text-[var(--text-tertiary)]"
-                  }`}
-                >
-                  {i < 2 ? "✓" : i + 1}
-                </motion.div>
-                <span className={`text-sm ${i < 2 ? "text-[var(--text-primary)]" : "text-[var(--text-tertiary)]"}`}>
-                  {phase}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      ),
-    },
-  ];
-
-  return (
-    <div className="min-h-screen gradient-bg">
-      {/* Mouse Follower */}
-      {isClient && (
-        <motion.div
-          className="mouse-follower hidden lg:block"
-          animate={{ x: mousePosition.x, y: mousePosition.y }}
-          transition={{ type: "spring", damping: 30, stiffness: 200 }}
-        />
-      )}
-
-      {/* Navigation */}
-      <motion.nav 
-        style={{ opacity: headerOpacity }}
-        className="fixed top-0 left-0 right-0 z-50 border-b border-[var(--border)] glass"
-      >
-        <div className="max-w-[1200px] mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-8">
-            <a href="/" className="flex items-center gap-2 text-[var(--text-primary)] font-semibold">
-              <motion.svg 
-                className="w-6 h-6 text-[var(--accent)]" 
-                fill="none" 
-                stroke="currentColor" 
-                viewBox="0 0 24 24"
-                whileHover={{ rotate: 180 }}
-                transition={{ duration: 0.3 }}
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </motion.svg>
-              Briefix
-            </a>
-            <div className="hidden md:flex items-center gap-6 text-sm text-[var(--text-secondary)]">
-              <a href="#features" className="hover:text-[var(--text-primary)] transition-colors">Features</a>
-              <a href="#how" className="hover:text-[var(--text-primary)] transition-colors">How it works</a>
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <a href="#" className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors hidden sm:block">
-              Log in
-            </a>
-            <motion.a 
-              href="#waitlist" 
-              className="btn-primary text-sm py-2.5 px-5"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              Get started
-            </motion.a>
-          </div>
-        </div>
-      </motion.nav>
-
-      {/* Hero */}
-      <section className="pt-36 pb-24 px-6 relative overflow-hidden">
-        <div className="max-w-[1200px] mx-auto">
-          <div className="max-w-3xl">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6 }}
-            >
-              <p className="section-label">Idea Management for Startups</p>
-            </motion.div>
-            
-            <motion.h1 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.1 }}
-              className="text-[clamp(40px,6vw,64px)] font-bold leading-[1.1] tracking-[-0.03em] text-[var(--text-primary)] mb-6"
-            >
-              Turn scattered ideas into
-              <br />
-              <span className="gradient-text">
-                {displayText}
-                <span className="typing-cursor" />
-              </span>
-            </motion.h1>
-            
-            <motion.p 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.2 }}
-              className="text-lg text-[var(--text-secondary)] leading-relaxed mb-8 max-w-xl"
-            >
-              Stop letting ideas die in Notion docs and spreadsheets. Collect, evaluate, and prioritize ideas as a team—then run experiments that actually ship.
-            </motion.p>
-            
-            <motion.div 
-              id="waitlist"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.3 }}
-            >
-              <WaitlistForm showCounter={true} />
-              <p className="mt-4 text-xs text-[var(--text-tertiary)]">
-                Free for small teams. No credit card required.
-              </p>
-            </motion.div>
-          </div>
-
-          {/* Hero Visual - Interactive Kanban */}
-          <motion.div 
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.4 }}
-            className="mt-20"
-          >
-            <div className="card p-1 overflow-hidden">
-              <div className="bg-[var(--bg-surface)] rounded-xl">
-                {/* Window header */}
-                <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
-                  <div className="flex items-center gap-3">
-                    <div className="flex gap-1.5">
-                      <div className="w-3 h-3 rounded-full bg-[#ff5f57]" />
-                      <div className="w-3 h-3 rounded-full bg-[#febc2e]" />
-                      <div className="w-3 h-3 rounded-full bg-[#28c840]" />
-                    </div>
-                    <span className="text-xs text-[var(--text-tertiary)] ml-2">Idea Pipeline</span>
-                  </div>
-                  <span className="text-xs text-[var(--accent)]">Try dragging cards →</span>
-                </div>
-                
-                {/* Kanban board */}
-                <DndContext
-                  sensors={sensors}
-                  collisionDetection={closestCorners}
-                  onDragStart={handleDragStart}
-                  onDragEnd={handleDragEnd}
-                >
-                  <div className="p-6 grid grid-cols-4 gap-4">
-                    {columns.map((column) => (
-                      <DroppableColumn key={column.id} column={column} />
-                    ))}
-                  </div>
-                  <DragOverlay>
-                    {activeItem ? (
-                      <div className="bg-[var(--bg-elevated)] rounded-lg p-3 border border-[var(--accent)] shadow-lg">
-                        <p className="text-sm text-[var(--text-primary)]">{activeItem.title}</p>
-                        <div className="flex items-center gap-2 mt-2">
-                          <div className="w-4 h-4 rounded-full bg-[var(--accent)]/20" />
-                          <span className="text-xs text-[var(--text-tertiary)]">{activeItem.time}</span>
-                        </div>
-                      </div>
-                    ) : null}
-                  </DragOverlay>
-                </DndContext>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* Interactive Playground */}
-      <section className="py-24 px-6 bg-[var(--bg-secondary)]">
-        <div className="max-w-[800px] mx-auto">
-          <ScrollReveal>
-            <div className="text-center mb-12">
-              <p className="section-label">Try it yourself</p>
-              <h2 className="section-title mb-4">
-                Experience Briefix with your ideas
-              </h2>
-              <p className="section-desc max-w-xl mx-auto">
-                Add your own ideas and see how Briefix helps you evaluate and prioritize them.
-              </p>
-            </div>
-          </ScrollReveal>
-
-          <PlaygroundDemo />
-        </div>
-      </section>
-
-      {/* Problem */}
-      <section className="py-24 px-6">
-        <div className="max-w-[1200px] mx-auto">
-          <ScrollReveal>
-            <div className="max-w-2xl mb-16">
-              <p className="section-label">The Problem</p>
-              <h2 className="section-title mb-4">
-                Ideas deserve better than a graveyard
-              </h2>
-              <p className="section-desc">
-                Your team generates dozens of ideas every month. Most of them end up forgotten in random docs, never evaluated, never tested. Sound familiar?
-              </p>
-            </div>
-          </ScrollReveal>
-
-          <div className="grid md:grid-cols-3 gap-6">
-            {[
-              {
-                icon: (
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-                  </svg>
-                ),
-                title: "Scattered everywhere",
-                desc: "Notion, Slack, spreadsheets, sticky notes... ideas live in too many places to track.",
-              },
-              {
-                icon: (
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                ),
-                title: "No review process",
-                desc: "Without a structured evaluation, good ideas get buried under urgent tasks.",
-              },
-              {
-                icon: (
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                ),
-                title: "Gut-based decisions",
-                desc: "Who decides what to build next? Usually whoever speaks loudest in the meeting.",
-              },
-            ].map((item, i) => (
-              <ScrollReveal key={i} delay={i * 0.1}>
-                <TiltCard className="h-full">
-                  <div className="card p-6 h-full">
-                    <motion.div 
-                      className="w-12 h-12 rounded-xl bg-[var(--accent)]/10 flex items-center justify-center text-[var(--accent)] mb-4"
-                      whileHover={{ scale: 1.1, rotate: 5 }}
-                    >
-                      {item.icon}
-                    </motion.div>
-                    <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">{item.title}</h3>
-                    <p className="text-sm text-[var(--text-secondary)] leading-relaxed">{item.desc}</p>
-                  </div>
-                </TiltCard>
-              </ScrollReveal>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Interactive Evaluation Demo */}
-      <section className="py-24 px-6 bg-[var(--bg-elevated)]">
-        <div className="max-w-[1200px] mx-auto">
-          <div className="grid md:grid-cols-2 gap-12 items-center">
-            <ScrollReveal>
-              <div>
-                <p className="section-label">Try it yourself</p>
-                <h2 className="section-title mb-4">
-                  Data-driven decisions
-                </h2>
-                <p className="section-desc mb-8">
-                  Rate ideas on multiple dimensions. See how scores affect priority rankings in real-time.
-                </p>
-                
-                {/* Interactive Sliders */}
-                <div className="space-y-6">
-                  <div className="relative">
-                    <InteractiveSlider
-                      label="Market Fit"
-                      value={scores.market}
-                      onChange={(v) => setScores({ ...scores, market: v })}
-                      color="var(--green)"
-                    />
-                  </div>
-                  <div className="relative">
-                    <InteractiveSlider
-                      label="Effort"
-                      value={scores.effort}
-                      onChange={(v) => setScores({ ...scores, effort: v })}
-                      color="var(--yellow)"
-                    />
-                  </div>
-                  <div className="relative">
-                    <InteractiveSlider
-                      label="Team Fit"
-                      value={scores.team}
-                      onChange={(v) => setScores({ ...scores, team: v })}
-                      color="var(--accent)"
-                    />
-                  </div>
-                </div>
-              </div>
-            </ScrollReveal>
-
-            <ScrollReveal delay={0.2}>
-              <div className="card p-6">
-                <div className="text-sm text-[var(--text-secondary)] mb-4">Priority Score</div>
-                <motion.div 
-                  className="text-6xl font-bold gradient-text mb-4"
-                  key={`${scores.market}-${scores.effort}-${scores.team}`}
-                  initial={{ scale: 0.8, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ type: "spring" }}
-                >
-                  {Math.round(((scores.market * 3 + (10 - scores.effort) * 2 + scores.team * 2) / 7) * 10)}
-                </motion.div>
-                <p className="text-sm text-[var(--text-tertiary)]">
-                  Based on weighted average of Market Fit (3x), Effort (2x inverse), and Team Fit (2x)
-                </p>
-                
-                <div className="mt-6 pt-6 border-t border-[var(--border)]">
-                  <div className="text-sm text-[var(--text-secondary)] mb-3">Recommendation</div>
-                  <motion.div
-                    key={scores.market + scores.team}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium ${
-                      (scores.market + scores.team) / 2 > 7
-                        ? "bg-[var(--green)]/10 text-[var(--green)]"
-                        : (scores.market + scores.team) / 2 > 5
-                        ? "bg-[var(--yellow)]/10 text-[var(--yellow)]"
-                        : "bg-[var(--red)]/10 text-[var(--red)]"
-                    }`}
-                  >
-                    {(scores.market + scores.team) / 2 > 7
-                      ? "🚀 Ship it!"
-                      : (scores.market + scores.team) / 2 > 5
-                      ? "🧪 Experiment first"
-                      : "❄️ Keep in backlog"}
-                  </motion.div>
-                </div>
-              </div>
-            </ScrollReveal>
-          </div>
-        </div>
-      </section>
-
-      {/* Features */}
-      <section id="features" className="py-24 px-6">
-        <div className="max-w-[1200px] mx-auto">
-          <ScrollReveal>
-            <div className="max-w-2xl mb-16">
-              <p className="section-label">Features</p>
-              <h2 className="section-title mb-4">
-                Built for how teams actually work
-              </h2>
-              <p className="section-desc">
-                Briefix fits into your existing workflow. Capture ideas fast, evaluate them together, and track experiments from start to finish.
-              </p>
-            </div>
-          </ScrollReveal>
-
-          <div className="grid md:grid-cols-2 gap-6">
-            {[
-              {
-                icon: (
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-                  </svg>
-                ),
-                title: "Idea Inbox",
-                desc: "Capture ideas from anywhere—Slack, email, or web. AI suggests tags and summaries automatically.",
-                tag: "30 sec capture",
-              },
-              {
-                icon: (
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
-                ),
-                title: "Team Scoring",
-                desc: "Rate ideas on Market, Effort, Team Fit, and more. Anonymous voting removes bias.",
-                tag: "Data-driven",
-              },
-              {
-                icon: (
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
-                  </svg>
-                ),
-                title: "Experiment Pipeline",
-                desc: "Move ideas through Research → Build → Ship stages. Connect to Linear, Notion, or Jira.",
-                tag: "End-to-end",
-              },
-              {
-                icon: (
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                ),
-                title: "Kill Log",
-                desc: "Document why ideas were killed. Learn from the past—revisit when timing changes.",
-                tag: "Never forget",
-              },
-            ].map((feature, i) => (
-              <ScrollReveal key={i} delay={i * 0.1}>
-                <TiltCard>
-                  <motion.div 
-                    className="card p-6 group h-full"
-                    whileHover={{ y: -5 }}
-                  >
-                    <div className="flex items-start justify-between mb-4">
-                      <motion.div 
-                        className="w-12 h-12 rounded-xl bg-[var(--accent)]/10 flex items-center justify-center text-[var(--accent)]"
-                        whileHover={{ scale: 1.1, rotate: 5 }}
-                      >
-                        {feature.icon}
-                      </motion.div>
-                      <span className="text-xs px-2.5 py-1 rounded-full bg-[var(--bg-surface)] text-[var(--text-tertiary)] border border-[var(--border)]">
-                        {feature.tag}
-                      </span>
-                    </div>
-                    <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">{feature.title}</h3>
-                    <p className="text-sm text-[var(--text-secondary)] leading-relaxed">{feature.desc}</p>
-                  </motion.div>
-                </TiltCard>
-              </ScrollReveal>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* How it works - Interactive */}
-      <section id="how" className="py-24 px-6 bg-[var(--bg-elevated)]">
-        <div className="max-w-[1200px] mx-auto">
-          <ScrollReveal>
-            <div className="text-center max-w-2xl mx-auto mb-16">
-              <p className="section-label">How it works</p>
-              <h2 className="section-title">
-                Three steps to better ideas
-              </h2>
-            </div>
-          </ScrollReveal>
-
-          {/* Step indicators */}
-          <div className="flex justify-center gap-4 mb-12">
-            {howItWorksSteps.map((item, i) => (
-              <motion.button
-                key={i}
-                onClick={() => setActiveStep(i)}
-                className={`step-indicator ${activeStep === i ? "active" : "inactive"}`}
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                {item.step}
-              </motion.button>
-            ))}
-          </div>
-
-          {/* Progress bar */}
-          <div className="max-w-md mx-auto mb-12">
-            <div className="progress-bar">
-              <motion.div 
-                className="progress-bar-fill"
-                initial={{ width: "33%" }}
-                animate={{ width: `${((activeStep + 1) / 3) * 100}%` }}
-              />
-            </div>
-          </div>
-
-          {/* Content */}
-          <div className="grid md:grid-cols-2 gap-12 items-center max-w-4xl mx-auto">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={activeStep}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
-                transition={{ duration: 0.3 }}
-              >
-                <h3 className="text-2xl font-bold text-[var(--text-primary)] mb-4">
-                  {howItWorksSteps[activeStep].title}
-                </h3>
-                <p className="text-[var(--text-secondary)] leading-relaxed">
-                  {howItWorksSteps[activeStep].desc}
-                </p>
-              </motion.div>
-            </AnimatePresence>
-
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={activeStep}
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                transition={{ duration: 0.3 }}
-              >
-                {howItWorksSteps[activeStep].visual}
-              </motion.div>
-            </AnimatePresence>
-          </div>
-        </div>
-      </section>
-
-      {/* For who */}
-      <section className="py-24 px-6">
-        <div className="max-w-[1200px] mx-auto">
-          <ScrollReveal>
-            <div className="text-center max-w-2xl mx-auto mb-16">
-              <p className="section-label">Built for</p>
-              <h2 className="section-title">
-                Teams that ship fast
-              </h2>
-            </div>
-          </ScrollReveal>
-
-          <div className="grid md:grid-cols-4 gap-4">
-            {[
-              {
-                icon: (
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                  </svg>
-                ),
-                title: "Early-stage startups",
-                desc: "5-20 person teams with more ideas than time"
-              },
-              {
-                icon: (
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                  </svg>
-                ),
-                title: "Innovation teams",
-                desc: "Corporate squads exploring new opportunities"
-              },
-              {
-                icon: (
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                  </svg>
-                ),
-                title: "Product squads",
-                desc: "Feature teams managing experiment backlogs"
-              },
-              {
-                icon: (
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                ),
-                title: "Indie hackers",
-                desc: "Solo builders validating multiple ideas"
-              },
-            ].map((item, i) => (
-              <ScrollReveal key={i} delay={i * 0.1}>
-                <TiltCard>
-                  <motion.div 
-                    className="card p-5 text-center h-full"
-                    whileHover={{ y: -5 }}
-                  >
-                    <motion.div 
-                      className="w-12 h-12 rounded-xl bg-[var(--accent)]/10 flex items-center justify-center text-[var(--accent)] mx-auto mb-4"
-                      whileHover={{ scale: 1.1, rotate: 10 }}
-                    >
-                      {item.icon}
-                    </motion.div>
-                    <h3 className="text-base font-semibold text-[var(--text-primary)] mb-2">{item.title}</h3>
-                    <p className="text-sm text-[var(--text-secondary)]">{item.desc}</p>
-                  </motion.div>
-                </TiltCard>
-              </ScrollReveal>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Final CTA */}
-      <section className="py-24 px-6 border-t border-[var(--border)] relative overflow-hidden">
-        <motion.div 
-          className="absolute inset-0 opacity-30"
-          style={{
-            background: "radial-gradient(ellipse at center, var(--accent-glow) 0%, transparent 70%)",
-          }}
-        />
-        <div className="max-w-2xl mx-auto text-center relative z-10">
-          <ScrollReveal>
-            <motion.h2 
-              className="text-4xl md:text-5xl font-bold text-[var(--text-primary)] mb-4"
-              whileInView={{ scale: [0.9, 1] }}
-              transition={{ duration: 0.5 }}
-            >
-              Ready to stop losing ideas?
-            </motion.h2>
-            <p className="text-lg text-[var(--text-secondary)] mb-8">
-              Join the waitlist and get early access when we launch.
-            </p>
-            <div className="flex justify-center">
-              <WaitlistForm showCounter={true} />
-            </div>
-          </ScrollReveal>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="py-12 px-6 border-t border-[var(--border)]">
-        <div className="max-w-[1200px] mx-auto">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="flex items-center gap-2 text-[var(--text-secondary)]">
-              <svg className="w-5 h-5 text-[var(--accent)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-              <span className="text-sm font-semibold">Briefix</span>
-            </div>
-            <p className="text-xs text-[var(--text-tertiary)]">
-              © 2025 Briefix. All rights reserved.
-            </p>
-            <div className="flex items-center gap-6 text-sm text-[var(--text-tertiary)]">
-              <a href="#" className="hover:text-[var(--text-secondary)] transition-colors">Privacy</a>
-              <a href="#" className="hover:text-[var(--text-secondary)] transition-colors">Terms</a>
-              <a href="#" className="hover:text-[var(--text-secondary)] transition-colors">Twitter</a>
-            </div>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }
