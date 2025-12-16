@@ -136,13 +136,34 @@ export default function BoardPage() {
       const res = await fetch("/api/teams");
       const data = await res.json();
       if (res.ok && data.teams) {
-        setTeams(data.teams);
         if (data.teams.length > 0) {
+          setTeams(data.teams);
           setCurrentTeamId(data.teams[0].id);
+          setLoading(false);
+        } else {
+          await autoCreateWorkspace();
         }
       }
     } catch (error) {
       console.error("Failed to fetch teams:", error);
+      setLoading(false);
+    }
+  };
+
+  const autoCreateWorkspace = async () => {
+    try {
+      const res = await fetch("/api/teams", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "My Workspace" }),
+      });
+      const data = await res.json();
+      if (res.ok && data.team) {
+        setTeams([data.team]);
+        setCurrentTeamId(data.team.id);
+      }
+    } catch (error) {
+      console.error("Failed to create workspace:", error);
     } finally {
       setLoading(false);
     }
@@ -211,16 +232,6 @@ export default function BoardPage() {
     return (
       <div className="p-8 flex items-center justify-center min-h-screen">
         <div className="animate-pulse text-[var(--text-tertiary)]">Loading...</div>
-      </div>
-    );
-  }
-
-  if (teams.length === 0) {
-    return (
-      <div className="p-8 flex items-center justify-center min-h-screen">
-        <p className="text-[var(--text-secondary)]">
-          Create a team first to view the board
-        </p>
       </div>
     );
   }
