@@ -11,19 +11,25 @@ export default function WaitlistForm({ showCounter = false }: WaitlistFormProps)
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
-  const [count, setCount] = useState(247);
+  const [count, setCount] = useState<number | null>(null);
 
-  // Simulate live counter updates
+  // Fetch real waitlist count
   useEffect(() => {
     if (!showCounter) return;
     
-    const interval = setInterval(() => {
-      if (Math.random() > 0.7) {
-        setCount(prev => prev + 1);
+    const fetchCount = async () => {
+      try {
+        const res = await fetch("/api/waitlist");
+        const data = await res.json();
+        if (data.count !== undefined) {
+          setCount(data.count);
+        }
+      } catch (error) {
+        console.error("Failed to fetch count:", error);
       }
-    }, 5000);
+    };
 
-    return () => clearInterval(interval);
+    fetchCount();
   }, [showCounter]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -46,20 +52,32 @@ export default function WaitlistForm({ showCounter = false }: WaitlistFormProps)
 
       const data = await res.json();
 
-      if (!res.ok && res.status !== 200) {
-        throw new Error(data.error || "Something went wrong");
+      if (res.status === 201) {
+        // Successfully added
+        setStatus("success");
+        setMessage(data.message || "You're on the list!");
+        setEmail("");
+        if (count !== null) {
+          setCount(count + 1);
+        }
+      } else if (res.status === 200) {
+        // Already on the list
+        setStatus("success");
+        setMessage(data.message || "You're already on the list!");
+        setEmail("");
+      } else if (res.status === 400) {
+        // Validation error
+        setStatus("error");
+        setMessage(data.error || "Please enter a valid email");
+      } else {
+        // Server error
+        setStatus("error");
+        setMessage(data.error || "Something went wrong. Please try again.");
       }
-
-      setStatus("success");
-      setMessage(data.message || "You're on the list!");
-      setEmail("");
-      setCount(prev => prev + 1);
-    } catch {
-      // Fallback for demo when Supabase is not configured
-      setStatus("success");
-      setMessage("You're on the list! We'll be in touch soon.");
-      setEmail("");
-      setCount(prev => prev + 1);
+    } catch (error) {
+      console.error("Submit error:", error);
+      setStatus("error");
+      setMessage("Network error. Please try again.");
     }
   };
 
@@ -142,7 +160,7 @@ export default function WaitlistForm({ showCounter = false }: WaitlistFormProps)
         )}
       </AnimatePresence>
 
-      {showCounter && (
+      {showCounter && count !== null && (
         <motion.div 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
