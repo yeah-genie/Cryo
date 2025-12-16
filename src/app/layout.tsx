@@ -9,7 +9,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Relay – Turn ideas into experiments",
+  title: "Briefix – Turn ideas into experiments",
   description: "Stop letting ideas die in Notion docs. Collect, evaluate, and prioritize ideas as a team—then run experiments that actually ship.",
   keywords: ["idea management", "startup", "experiments", "product development", "team collaboration"],
 };
