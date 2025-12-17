@@ -32,11 +32,11 @@ function FAQAccordion() {
   ];
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {faqs.map((faq, i) => (
         <div
           key={i}
-          className="border border-zinc-800 rounded-xl overflow-hidden"
+          className="border border-zinc-800 rounded-xl overflow-hidden bg-zinc-900/30"
         >
           <button
             onClick={() => setOpenIndex(openIndex === i ? null : i)}
