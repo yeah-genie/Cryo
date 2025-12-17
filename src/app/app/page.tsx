@@ -63,7 +63,8 @@ const experiments: Experiment[] = [
   },
 ];
 
-const statusConfig = {
+const statusConfig: Record<string, { label: string; color: string; bg: string; text: string }> = {
+  all: { label: "All", color: "#3B82F6", bg: "bg-[var(--accent)]/10", text: "text-[var(--accent)]" },
   tracking: { label: "Tracking", color: "#3B82F6", bg: "bg-blue-500/10", text: "text-blue-400" },
   success: { label: "Success", color: "#10B981", bg: "bg-emerald-500/10", text: "text-emerald-400" },
   neutral: { label: "No change", color: "#6B7280", bg: "bg-zinc-500/10", text: "text-zinc-400" },
