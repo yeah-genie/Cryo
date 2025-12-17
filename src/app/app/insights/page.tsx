@@ -64,17 +64,12 @@ export default function InsightsPage() {
 
           {/* Pattern insight */}
           <div className="pt-4 border-t border-[var(--border)]">
-            <div className="flex items-start gap-2">
-              <span className="text-blue-400">🧠</span>
-              <div>
-                <p className="text-sm font-medium text-[var(--text-primary)] mb-1">
-                  Pattern
-                </p>
-                <p className="text-sm text-blue-300">
-                  {weeklyReport.pattern}
-                </p>
-              </div>
-            </div>
+            <p className="text-sm font-medium text-[var(--text-primary)] mb-1">
+              Pattern
+            </p>
+            <p className="text-sm text-blue-300">
+              {weeklyReport.pattern}
+            </p>
           </div>
         </div>
       </div>

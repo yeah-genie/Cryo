@@ -1,8 +1,75 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { motion, useInView, useScroll, useTransform } from "framer-motion";
+import { motion, useInView, useScroll, useTransform, AnimatePresence } from "framer-motion";
 import Link from "next/link";
+
+// FAQ Accordion Component
+function FAQAccordion() {
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
+  
+  const faqs = [
+    {
+      q: "Is it really zero input?",
+      a: "Yes. Once you connect your tools, we watch your deploys and pull metrics automatically. You don't need to log experiments, tag commits, or fill out forms. Just ship code like you always do."
+    },
+    {
+      q: "What data sources do you use?",
+      a: "We connect to GitHub (code changes), Vercel (deployments), and your analytics tool (Google Analytics, Mixpanel, Amplitude, etc.). We compare metrics before and after each deploy to detect impact."
+    },
+    {
+      q: "Do I need to install an SDK?",
+      a: "No SDK required. We use OAuth to connect to your existing tools. No code changes, no new dependencies, no deployment pipeline modifications."
+    },
+    {
+      q: "How accurate is the automatic detection?",
+      a: "We track file changes per deploy and correlate them with metric changes. For most product changes, this works well. For complex multi-feature deploys, we'll ask you to confirm what changed."
+    },
+    {
+      q: "What if I want to track something manually?",
+      a: "You can always add manual experiments or override our auto-detection. But most teams find they don't need to — we catch everything automatically."
+    },
+  ];
+
+  return (
+    <div className="space-y-3">
+      {faqs.map((faq, i) => (
+        <div
+          key={i}
+          className="border border-zinc-800 rounded-xl overflow-hidden"
+        >
+          <button
+            onClick={() => setOpenIndex(openIndex === i ? null : i)}
+            className="w-full flex items-center justify-between p-5 text-left hover:bg-zinc-900/50 transition-colors"
+          >
+            <span className="text-base font-medium text-white">{faq.q}</span>
+            <svg 
+              className={`w-5 h-5 text-zinc-500 transition-transform ${openIndex === i ? "rotate-180" : ""}`} 
+              fill="none" 
+              stroke="currentColor" 
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          <AnimatePresence>
+            {openIndex === i && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="overflow-hidden"
+              >
+                <p className="px-5 pb-5 text-zinc-400 leading-relaxed">{faq.a}</p>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 // Section wrapper with scroll animation
 function Section({ children, className = "" }: { children: React.ReactNode; className?: string }) {
@@ -219,7 +286,7 @@ function ShipDemo() {
         )}
         {phase >= 3 && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="pt-2 space-y-1">
-            <p className="text-blue-400">🤖 Briefix detected:</p>
+            <p className="text-blue-400">Briefix detected:</p>
             <p className="text-zinc-400 pl-4">pricing.tsx changed</p>
             <p className="text-zinc-400 pl-4">Tracking: Conversion rate</p>
           </motion.div>
@@ -291,12 +358,9 @@ function LearnDemo() {
           transition={{ delay: 0.7 }}
           className="px-5 py-4 bg-blue-500/5 border-t border-blue-500/10"
         >
-          <div className="flex items-start gap-2">
-            <span className="text-blue-400">🧠</span>
-            <p className="text-sm text-blue-300">
-              <span className="font-medium">Pattern:</span> UX flow changes beat color tweaks
-            </p>
-          </div>
+          <p className="text-sm text-blue-300">
+            <span className="font-medium">Pattern:</span> UX flow changes beat color tweaks
+          </p>
         </motion.div>
       </motion.div>
     </div>
@@ -488,42 +552,7 @@ export default function LandingPage() {
             Frequently asked questions
           </h2>
           
-          <div className="space-y-6">
-            {[
-              {
-                q: "Is it really zero input?",
-                a: "Yes. Once you connect your tools, we watch your deploys and pull metrics automatically. You don't need to log experiments, tag commits, or fill out forms. Just ship code like you always do."
-              },
-              {
-                q: "What data sources do you use?",
-                a: "We connect to GitHub (code changes), Vercel (deployments), and your analytics tool (Google Analytics, Mixpanel, Amplitude, etc.). We compare metrics before and after each deploy to detect impact."
-              },
-              {
-                q: "Do I need to install an SDK?",
-                a: "No SDK required. We use OAuth to connect to your existing tools. No code changes, no new dependencies, no deployment pipeline modifications."
-              },
-              {
-                q: "How accurate is the automatic detection?",
-                a: "We track file changes per deploy and correlate them with metric changes. For most product changes, this works well. For complex multi-feature deploys, we'll ask you to confirm what changed."
-              },
-              {
-                q: "What if I want to track something manually?",
-                a: "You can always add manual experiments or override our auto-detection. But most teams find they don't need to — we catch everything automatically."
-              },
-            ].map((faq, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.1 }}
-                className="border border-zinc-800 rounded-xl p-6"
-              >
-                <h3 className="text-lg font-medium text-white mb-2">{faq.q}</h3>
-                <p className="text-zinc-400 leading-relaxed">{faq.a}</p>
-              </motion.div>
-            ))}
-          </div>
+          <FAQAccordion />
         </div>
       </Section>
 
