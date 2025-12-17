@@ -107,26 +107,25 @@ function AmplitudeIcon() {
   );
 }
 
-// Connect animation
+// Connect animation - shows what it does after connecting
 function ConnectDemo() {
-  const [connected, setConnected] = useState<boolean[]>([]);
+  const [phase, setPhase] = useState(0);
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true });
 
   const tools = [
-    { name: "GitHub", icon: <GitHubIcon /> },
-    { name: "Vercel", icon: <VercelIcon /> },
-    { name: "Google Analytics", icon: <GoogleAnalyticsIcon /> },
-    { name: "Slack", icon: <SlackIcon /> },
-    { name: "Mixpanel", icon: <MixpanelIcon /> },
-    { name: "Amplitude", icon: <AmplitudeIcon /> },
+    { name: "GitHub", icon: <GitHubIcon />, status: "Watching code changes..." },
+    { name: "Vercel", icon: <VercelIcon />, status: "Tracking deploys..." },
+    { name: "Google Analytics", icon: <GoogleAnalyticsIcon />, status: "Monitoring conversions..." },
+    { name: "Slack", icon: <SlackIcon />, status: "Ready for alerts..." },
+    { name: "Mixpanel", icon: <MixpanelIcon />, status: "Syncing events..." },
+    { name: "Amplitude", icon: <AmplitudeIcon />, status: "Pulling metrics..." },
   ];
 
   useEffect(() => {
     if (!isInView) return;
-    setConnected([]);
     const timers = tools.map((_, i) => 
-      setTimeout(() => setConnected(prev => [...prev, true]), 200 * (i + 1))
+      setTimeout(() => setPhase(i + 1), 300 * (i + 1))
     );
     return () => timers.forEach(clearTimeout);
   }, [isInView]);
@@ -140,24 +139,33 @@ function ConnectDemo() {
           animate={isInView ? { opacity: 1, scale: 1 } : {}}
           transition={{ delay: i * 0.08 }}
           className={`flex items-center gap-3 p-3 rounded-lg border transition-all duration-400 ${
-            connected[i] 
+            phase > i 
               ? "bg-emerald-500/5 border-emerald-500/20" 
               : "bg-zinc-900/50 border-zinc-800"
           }`}
         >
           <div className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-400 ${
-            connected[i] ? "bg-white text-black" : "bg-zinc-800 text-zinc-500"
+            phase > i ? "bg-white text-black" : "bg-zinc-800 text-zinc-500"
           }`}>
             {tool.icon}
           </div>
           <div className="flex-1 min-w-0">
-            <span className="text-sm text-white truncate block">{tool.name}</span>
+            <span className="text-sm text-white block">{tool.name}</span>
+            {phase > i && (
+              <motion.span 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="text-[10px] text-emerald-400 block"
+              >
+                {tool.status}
+              </motion.span>
+            )}
           </div>
-          {connected[i] && (
+          {phase > i && (
             <motion.div 
               initial={{ scale: 0 }} 
               animate={{ scale: 1 }}
-              className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center"
+              className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0"
             >
               <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
@@ -170,7 +178,7 @@ function ConnectDemo() {
   );
 }
 
-// Ship animation
+// Ship animation - shows auto detection
 function ShipDemo() {
   const [phase, setPhase] = useState(0);
   const ref = useRef(null);
@@ -180,8 +188,9 @@ function ShipDemo() {
     if (!isInView) return;
     const timers = [
       setTimeout(() => setPhase(1), 500),
-      setTimeout(() => setPhase(2), 1500),
-      setTimeout(() => setPhase(3), 2500),
+      setTimeout(() => setPhase(2), 1200),
+      setTimeout(() => setPhase(3), 1900),
+      setTimeout(() => setPhase(4), 2600),
     ];
     return () => timers.forEach(clearTimeout);
   }, [isInView]);
@@ -196,81 +205,100 @@ function ShipDemo() {
         </div>
         <span className="text-xs text-zinc-500 ml-2">Terminal</span>
       </div>
-      <div className="p-5 font-mono text-sm space-y-2">
+      <div className="p-5 font-mono text-sm space-y-1.5">
         <p className="text-zinc-500">$ git push origin main</p>
         {phase >= 1 && (
-          <motion.p 
-            initial={{ opacity: 0 }} 
-            animate={{ opacity: 1 }}
-            className="text-zinc-400"
-          >
-            Enumerating objects: 42, done.
+          <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-zinc-400">
+            Writing objects: 100% (42/42), done.
           </motion.p>
         )}
         {phase >= 2 && (
-          <motion.p 
-            initial={{ opacity: 0 }} 
-            animate={{ opacity: 1 }}
-            className="text-zinc-400"
-          >
-            Writing objects: 100% (42/42)
+          <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-emerald-400">
+            ✓ Deployed to production
           </motion.p>
         )}
         {phase >= 3 && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="pt-2">
-            <p className="text-emerald-400">✓ Deployed to production</p>
-            <p className="text-blue-400 mt-1">→ Experiment #127 started tracking</p>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="pt-2 space-y-1">
+            <p className="text-blue-400">🤖 Briefix detected:</p>
+            <p className="text-zinc-400 pl-4">pricing.tsx changed</p>
+            <p className="text-zinc-400 pl-4">Tracking: Conversion rate</p>
           </motion.div>
+        )}
+        {phase >= 4 && (
+          <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-violet-400 pl-4">
+            Auto-hypothesis: "Price change → Signup impact"
+          </motion.p>
         )}
       </div>
     </div>
   );
 }
 
-// Learn animation
+// Learn animation - Weekly report style
 function LearnDemo() {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true });
 
-  const experiments = [
-    { name: "Checkout redesign", before: "12%", after: "18%", change: "+50%", status: "success" },
-    { name: "New pricing page", before: "2.1%", after: "2.8%", change: "+33%", status: "success" },
-    { name: "CTA button color", before: "8%", after: "8%", change: "0%", status: "neutral" },
-  ];
-
   return (
-    <div ref={ref} className="space-y-3">
-      {experiments.map((exp, i) => (
-        <motion.div
-          key={exp.name}
-          initial={{ opacity: 0, y: 20 }}
-          animate={isInView ? { opacity: 1, y: 0 } : {}}
-          transition={{ delay: i * 0.15 }}
-          className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4"
-        >
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-white font-medium">{exp.name}</span>
-            <span className={`text-sm font-medium px-2 py-0.5 rounded ${
-              exp.status === "success" 
-                ? "bg-emerald-500/10 text-emerald-400" 
-                : "bg-zinc-800 text-zinc-500"
-            }`}>
-              {exp.change}
-            </span>
+    <div ref={ref}>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={isInView ? { opacity: 1, y: 0 } : {}}
+        className="bg-zinc-900/50 border border-zinc-800 rounded-xl overflow-hidden"
+      >
+        {/* Header */}
+        <div className="px-5 py-4 border-b border-zinc-800/80 bg-zinc-900/80">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-zinc-500">Weekly Report</p>
+              <p className="text-white font-medium">Dec 9 - 15</p>
+            </div>
+            <div className="text-xs text-zinc-500">Auto-generated</div>
           </div>
-          <div className="flex items-center gap-4 text-sm">
-            <div className="text-zinc-500">
-              Before: <span className="text-zinc-300">{exp.before}</span>
-            </div>
-            <svg className="w-4 h-4 text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-            </svg>
-            <div className="text-zinc-500">
-              After: <span className={exp.status === "success" ? "text-emerald-400 font-medium" : "text-zinc-300"}>{exp.after}</span>
-            </div>
+        </div>
+
+        {/* Experiments */}
+        <div className="p-5 space-y-3">
+          <p className="text-xs text-zinc-500 uppercase tracking-wide">This week's experiments</p>
+          
+          {[
+            { name: "Checkout redesign", result: "+50% conversion", success: true },
+            { name: "New pricing page", result: "+33% signups", success: true },
+            { name: "CTA button color", result: "No change", success: false },
+          ].map((exp, i) => (
+            <motion.div
+              key={exp.name}
+              initial={{ opacity: 0, x: -10 }}
+              animate={isInView ? { opacity: 1, x: 0 } : {}}
+              transition={{ delay: 0.3 + i * 0.1 }}
+              className="flex items-center justify-between py-2"
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-zinc-600">├─</span>
+                <span className="text-zinc-300">{exp.name}</span>
+              </div>
+              <span className={`text-sm font-medium ${exp.success ? "text-emerald-400" : "text-zinc-500"}`}>
+                {exp.result} {exp.success && "✓"}
+              </span>
+            </motion.div>
+          ))}
+        </div>
+
+        {/* Insight */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={isInView ? { opacity: 1 } : {}}
+          transition={{ delay: 0.7 }}
+          className="px-5 py-4 bg-blue-500/5 border-t border-blue-500/10"
+        >
+          <div className="flex items-start gap-2">
+            <span className="text-blue-400">🧠</span>
+            <p className="text-sm text-blue-300">
+              <span className="font-medium">Pattern:</span> UX flow changes beat color tweaks
+            </p>
           </div>
         </motion.div>
-      ))}
+      </motion.div>
     </div>
   );
 }
@@ -363,7 +391,7 @@ export default function LandingPage() {
           >
             <div className="inline-flex items-center gap-2 text-xs text-zinc-400 border border-zinc-800 rounded-full px-3 py-1.5 mb-8">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              Now in private beta
+              Zero-effort experiment tracking
             </div>
             
             <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold leading-[1.1] tracking-tight mb-6">
@@ -373,7 +401,7 @@ export default function LandingPage() {
             </h1>
             
             <p className="text-xl text-zinc-400 leading-relaxed mb-10 max-w-lg mx-auto">
-              Connect your stack once. We'll track every deploy and tell you what's actually moving the needle.
+              Connect your stack once. Zero input from you — we watch deploys, compare metrics, and tell you what worked.
             </p>
 
             {/* Email form in Hero */}
@@ -381,9 +409,10 @@ export default function LandingPage() {
               <motion.div 
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 max-w-md mx-auto"
+                className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-5 max-w-md mx-auto"
               >
-                <p className="text-emerald-400 font-medium">You're on the list! We'll be in touch.</p>
+                <p className="text-emerald-400 font-medium mb-1">You're on the list!</p>
+                <p className="text-sm text-zinc-400">We'll set you up with automatic experiment tracking soon.</p>
               </motion.div>
             ) : (
               <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
@@ -432,7 +461,7 @@ export default function LandingPage() {
       <FeatureSection
         label="Step 1"
         title="Connect once, track forever"
-        description="Authenticate with your existing tools. Takes about 5 minutes, no code changes required. We play nice with everything you already use."
+        description="Authenticate with your stack in 5 minutes. No SDK, no code changes. Once connected, we start watching everything automatically."
       >
         <ConnectDemo />
       </FeatureSection>
@@ -441,7 +470,7 @@ export default function LandingPage() {
       <FeatureSection
         label="Step 2"
         title="Ship like you always do"
-        description="Just keep pushing code. We watch your deploys and automatically figure out what changed. You don't have to remember to log anything."
+        description="Just keep pushing code. We detect what changed, auto-generate hypotheses, and start tracking the right metrics. You don't lift a finger."
       >
         <ShipDemo />
       </FeatureSection>
@@ -449,8 +478,8 @@ export default function LandingPage() {
       {/* Feature 3: Learn */}
       <FeatureSection
         label="Step 3"
-        title="See what actually works"
-        description="Every change gets tracked with real metrics. No more guessing if that button tweak helped or hurt. You'll know within days, not months."
+        title="Get weekly insights, automatically"
+        description="Every Monday, you get a report of what worked and what didn't. We spot patterns so you can double down on what matters."
       >
         <LearnDemo />
       </FeatureSection>
@@ -473,7 +502,7 @@ export default function LandingPage() {
                 </svg>
               </div>
               <p className="text-white font-medium">You're on the list!</p>
-              <p className="text-sm text-zinc-400 mt-1">We'll reach out soon.</p>
+              <p className="text-sm text-zinc-400 mt-1">We'll set you up with automatic tracking soon.</p>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3">
