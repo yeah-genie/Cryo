@@ -367,11 +367,8 @@ export default function LandingPage() {
             Briefix
           </Link>
           <div className="flex items-center gap-4">
-            <Link href="/login" className="text-sm text-zinc-400 hover:text-white transition-colors">
-              Log in
-            </Link>
-            <Link href="/signup" className="text-sm bg-white text-black font-medium px-4 py-1.5 rounded-md hover:bg-zinc-200 transition-colors">
-              Sign up
+            <Link href="/app" className="text-sm bg-white text-black font-medium px-4 py-1.5 rounded-md hover:bg-zinc-200 transition-colors">
+              Try a demo
             </Link>
           </div>
         </div>
@@ -484,6 +481,52 @@ export default function LandingPage() {
         <LearnDemo />
       </FeatureSection>
 
+      {/* FAQ Section */}
+      <Section className="py-32 px-6 border-t border-zinc-800/50">
+        <div className="max-w-3xl mx-auto">
+          <h2 className="text-3xl sm:text-4xl font-semibold text-white mb-12 text-center">
+            Frequently asked questions
+          </h2>
+          
+          <div className="space-y-6">
+            {[
+              {
+                q: "Is it really zero input?",
+                a: "Yes. Once you connect your tools, we watch your deploys and pull metrics automatically. You don't need to log experiments, tag commits, or fill out forms. Just ship code like you always do."
+              },
+              {
+                q: "What data sources do you use?",
+                a: "We connect to GitHub (code changes), Vercel (deployments), and your analytics tool (Google Analytics, Mixpanel, Amplitude, etc.). We compare metrics before and after each deploy to detect impact."
+              },
+              {
+                q: "Do I need to install an SDK?",
+                a: "No SDK required. We use OAuth to connect to your existing tools. No code changes, no new dependencies, no deployment pipeline modifications."
+              },
+              {
+                q: "How accurate is the automatic detection?",
+                a: "We track file changes per deploy and correlate them with metric changes. For most product changes, this works well. For complex multi-feature deploys, we'll ask you to confirm what changed."
+              },
+              {
+                q: "What if I want to track something manually?",
+                a: "You can always add manual experiments or override our auto-detection. But most teams find they don't need to — we catch everything automatically."
+              },
+            ].map((faq, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.1 }}
+                className="border border-zinc-800 rounded-xl p-6"
+              >
+                <h3 className="text-lg font-medium text-white mb-2">{faq.q}</h3>
+                <p className="text-zinc-400 leading-relaxed">{faq.a}</p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </Section>
+
       {/* CTA Section */}
       <Section className="py-32 px-6">
         <div className="max-w-md mx-auto text-center">
@@ -531,7 +574,7 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto flex items-center justify-between text-sm text-zinc-600">
           <span>© 2025 Briefix</span>
           <div className="flex items-center gap-6">
-            <Link href="/login" className="hover:text-zinc-400 transition-colors">Log in</Link>
+            <Link href="/app" className="hover:text-zinc-400 transition-colors">Try a demo</Link>
             <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" className="hover:text-zinc-400 transition-colors">
               Twitter
             </a>
