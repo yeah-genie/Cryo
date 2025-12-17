@@ -432,7 +432,7 @@ export default function LandingPage() {
           </Link>
           <div className="flex items-center gap-4">
             <Link href="/app" className="text-sm bg-white text-black font-medium px-4 py-1.5 rounded-md hover:bg-zinc-200 transition-colors">
-              Try a demo
+              Try Slack demo
             </Link>
           </div>
         </div>
@@ -603,7 +603,7 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto flex items-center justify-between text-sm text-zinc-600">
           <span>© 2025 Briefix</span>
           <div className="flex items-center gap-6">
-            <Link href="/app" className="hover:text-zinc-400 transition-colors">Try a demo</Link>
+            <Link href="/app" className="hover:text-zinc-400 transition-colors">Try Slack demo</Link>
             <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" className="hover:text-zinc-400 transition-colors">
               Twitter
             </a>
