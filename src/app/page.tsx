@@ -15,15 +15,24 @@ function ZoomIcon() {
   );
 }
 
-// Google Meet logo - accurate brand style  
+// Google Meet logo - accurate 4-color brand style
 function MeetIcon() {
   return (
     <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
-      <path d="M3 6.5A2.5 2.5 0 015.5 4h8A2.5 2.5 0 0116 6.5v2l4.4-2.93a1 1 0 011.6.8v11.26a1 1 0 01-1.6.8L16 15.5v2a2.5 2.5 0 01-2.5 2.5h-8A2.5 2.5 0 013 17.5v-11z" fill="#00AC47"/>
-      <path d="M16 8.5l5.4-3.6a1 1 0 011.6.8v12.6a1 1 0 01-1.6.8L16 15.5v-7z" fill="#00832D"/>
-      <path d="M3 12h13v5.5a2.5 2.5 0 01-2.5 2.5h-8A2.5 2.5 0 013 17.5V12z" fill="#00AC47"/>
-      <path d="M3 6.5A2.5 2.5 0 015.5 4h8A2.5 2.5 0 0116 6.5V12H3V6.5z" fill="#4285F4"/>
-      <path d="M8 9a2 2 0 114 0 2 2 0 01-4 0z" fill="white"/>
+      {/* Blue left side */}
+      <path d="M2 6a2 2 0 012-2h2v8H2V6z" fill="#4285F4"/>
+      <path d="M2 12h4v8H4a2 2 0 01-2-2v-6z" fill="#0D65D9"/>
+      {/* Red top-left corner */}
+      <path d="M4 4h4L4 8V4z" fill="#EA4335"/>
+      {/* Yellow/Orange top */}
+      <path d="M8 4h6a2 2 0 012 2v2l-2 2H6V6l2-2z" fill="#FBBC04"/>
+      {/* White center */}
+      <path d="M6 8h8v6H6V8z" fill="white"/>
+      {/* Green bottom and right */}
+      <path d="M6 14h8l2 2v2a2 2 0 01-2 2H6v-6z" fill="#34A853"/>
+      {/* Green play button */}
+      <path d="M16 8l6-3v14l-6-3V8z" fill="#188038"/>
+      <path d="M16 8l6-3v8l-6-1V8z" fill="#34A853"/>
     </svg>
   );
 }
@@ -314,112 +323,188 @@ function BeforeAfterDemo() {
 }
 
 // ============================================
-// WOW 3: WEEKLY REPORT - History Lesson
+// WOW 3: WEEKLY REPORT - Premium Dashboard Style
 // ============================================
 function WeeklyReportDemo() {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-100px" });
-  const [animateGraph, setAnimateGraph] = useState(false);
-
-  useEffect(() => {
-    if (isInView) {
-      setTimeout(() => setAnimateGraph(true), 500);
-    }
-  }, [isInView]);
+  const [activeTab, setActiveTab] = useState(0);
 
   const weekData = [
-    { day: "Mon", value: 62 },
-    { day: "Tue", value: 71 },
-    { day: "Wed", value: 68 },
-    { day: "Thu", value: 85 },
-    { day: "Fri", value: 89 },
+    { day: "M", value: 62, sessions: 2 },
+    { day: "T", value: 71, sessions: 1 },
+    { day: "W", value: 68, sessions: 2 },
+    { day: "T", value: 85, sessions: 1 },
+    { day: "F", value: 89, sessions: 2 },
   ];
 
   return (
     <div ref={ref} className="relative">
-      {/* Email preview container */}
+      {/* Glow effect */}
+      <div className="absolute -inset-4 bg-gradient-to-r from-cyan-500/10 via-transparent to-emerald-500/10 rounded-3xl blur-2xl" />
+      
       <motion.div
         initial={{ opacity: 0, y: 30 }}
         animate={isInView ? { opacity: 1, y: 0 } : {}}
-        className="relative bg-[#0a0a0a] border border-zinc-800 rounded-2xl overflow-hidden shadow-2xl"
+        className="relative"
       >
-        {/* Email header */}
-        <div className="px-6 py-4 border-b border-zinc-800 bg-zinc-900/30">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center">
-              <span className="text-white font-bold text-xs">C</span>
-            </div>
-            <div>
-              <p className="text-sm text-zinc-300">Your Weekly Teaching Report</p>
-              <p className="text-xs text-zinc-600">From: Chalk Analytics</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="p-6 space-y-6">
-          {/* Week summary */}
-          <div className="grid grid-cols-3 gap-4">
-            <div className="text-center">
-              <p className="text-2xl font-bold text-white">5</p>
-              <p className="text-xs text-zinc-500">Sessions</p>
-            </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold text-emerald-400">↑18%</p>
-              <p className="text-xs text-zinc-500">Engagement</p>
-            </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold text-cyan-400">3</p>
-              <p className="text-xs text-zinc-500">Breakthroughs</p>
-            </div>
-          </div>
-
-          {/* Graph */}
-          <div className="p-4 bg-zinc-900/50 rounded-xl border border-zinc-800">
-            <p className="text-xs text-zinc-500 mb-4">Student engagement this week</p>
-            <div className="flex items-end justify-between gap-2 h-24">
-              {weekData.map((day, i) => (
-                <div key={day.day} className="flex-1 flex flex-col items-center gap-2">
-                  <motion.div
-                    initial={{ height: 0 }}
-                    animate={animateGraph ? { height: `${day.value}%` } : {}}
-                    transition={{ duration: 0.5, delay: i * 0.1 }}
-                    className={`w-full rounded-t ${
-                      day.value >= 80 
-                        ? "bg-gradient-to-t from-emerald-600 to-emerald-400" 
-                        : "bg-gradient-to-t from-cyan-600 to-cyan-400"
-                    }`}
-                  />
-                  <span className="text-xs text-zinc-600">{day.day}</span>
+        {/* Report container */}
+        <div className="bg-[#0c0c0c] border border-zinc-800/80 rounded-2xl overflow-hidden">
+          {/* Header */}
+          <div className="px-6 py-5 border-b border-zinc-800/50 bg-gradient-to-r from-zinc-900/80 to-zinc-900/40">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  </svg>
                 </div>
+                <div>
+                  <p className="text-white font-medium">Weekly Report</p>
+                  <p className="text-xs text-zinc-500">Dec 9 - Dec 15, 2024</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-full">
+                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-xs text-emerald-400">+18% vs last week</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-6">
+            {/* Stats row */}
+            <div className="grid grid-cols-4 gap-3 mb-6">
+              {[
+                { value: "8", label: "Sessions", trend: null },
+                { value: "76%", label: "Avg. Engagement", trend: "+12%" },
+                { value: "5", label: "Breakthroughs", trend: "+2" },
+                { value: "23min", label: "Avg. Duration", trend: null },
+              ].map((stat, i) => (
+                <motion.div
+                  key={stat.label}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={isInView ? { opacity: 1, y: 0 } : {}}
+                  transition={{ delay: 0.2 + i * 0.1 }}
+                  className="p-3 bg-zinc-900/50 rounded-xl border border-zinc-800/50"
+                >
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-xl font-bold text-white">{stat.value}</span>
+                    {stat.trend && (
+                      <span className="text-xs text-emerald-400">{stat.trend}</span>
+                    )}
+                  </div>
+                  <p className="text-xs text-zinc-500 mt-0.5">{stat.label}</p>
+                </motion.div>
               ))}
             </div>
-          </div>
 
-          {/* Best moment */}
-          <div className="p-4 bg-gradient-to-r from-amber-500/5 to-orange-500/5 border border-amber-500/20 rounded-xl">
-            <div className="flex items-center gap-2 mb-2">
-              <svg className="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-              </svg>
-              <span className="text-sm text-amber-300 font-medium">Best Moment This Week</span>
+            {/* Graph - minimal elegant */}
+            <div className="mb-6 p-4 bg-zinc-900/30 rounded-xl border border-zinc-800/50">
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-xs text-zinc-500">Engagement trend</span>
+                <div className="flex gap-1">
+                  {["1W", "1M", "3M"].map((period, i) => (
+                    <button
+                      key={period}
+                      onClick={() => setActiveTab(i)}
+                      className={`px-2 py-1 text-xs rounded ${
+                        activeTab === i 
+                          ? "bg-zinc-800 text-white" 
+                          : "text-zinc-600 hover:text-zinc-400"
+                      }`}
+                    >
+                      {period}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              
+              {/* Sparkline style graph */}
+              <div className="relative h-20">
+                <svg className="w-full h-full" viewBox="0 0 200 60" preserveAspectRatio="none">
+                  <defs>
+                    <linearGradient id="graphGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="rgb(34, 211, 238)" stopOpacity="0.3" />
+                      <stop offset="100%" stopColor="rgb(34, 211, 238)" stopOpacity="0" />
+                    </linearGradient>
+                  </defs>
+                  <motion.path
+                    initial={{ pathLength: 0 }}
+                    animate={isInView ? { pathLength: 1 } : {}}
+                    transition={{ duration: 1.5, delay: 0.5 }}
+                    d="M0,45 Q25,40 40,38 T80,30 T120,25 T160,15 T200,10"
+                    fill="none"
+                    stroke="rgb(34, 211, 238)"
+                    strokeWidth="2"
+                  />
+                  <path
+                    d="M0,45 Q25,40 40,38 T80,30 T120,25 T160,15 T200,10 L200,60 L0,60 Z"
+                    fill="url(#graphGradient)"
+                  />
+                </svg>
+                
+                {/* Day markers */}
+                <div className="absolute bottom-0 left-0 right-0 flex justify-between px-2">
+                  {weekData.map((day) => (
+                    <span key={day.day} className="text-[10px] text-zinc-600">{day.day}</span>
+                  ))}
+                </div>
+              </div>
             </div>
-            <p className="text-sm text-zinc-300 mb-1">
-              History — French Revolution
-            </p>
-            <p className="text-xs text-zinc-400">
-              "What would YOU do if bread cost a month's salary?" — Role-play question triggered 4-minute student discussion
-            </p>
-            <p className="text-xs text-emerald-400 mt-2">
-              2.4x more engagement than lecture-style delivery
-            </p>
-          </div>
 
-          {/* Suggestion */}
-          <div className="p-4 bg-zinc-900/30 border border-zinc-800 rounded-xl">
-            <p className="text-xs text-cyan-400 mb-1">Try this next week</p>
-            <p className="text-sm text-zinc-300">
-              Your students respond well to "what if" questions. Try opening each topic with a hypothetical scenario.
-            </p>
+            {/* Best moment - premium card */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={isInView ? { opacity: 1, scale: 1 } : {}}
+              transition={{ delay: 0.6 }}
+              className="relative overflow-hidden rounded-xl"
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-amber-500/10 via-orange-500/5 to-transparent" />
+              <div className="relative p-4 border border-amber-500/20 rounded-xl">
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-500/20 flex items-center justify-center flex-shrink-0">
+                    <svg className="w-6 h-6 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                    </svg>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-sm font-medium text-amber-300">Best Moment</span>
+                      <span className="text-xs text-zinc-600">History — French Revolution</span>
+                    </div>
+                    <p className="text-sm text-white mb-2">
+                      "What would YOU do if bread cost a month's salary?"
+                    </p>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-zinc-500">4-min discussion triggered</span>
+                      <span className="text-xs text-emerald-400 font-medium">2.4x engagement</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* AI suggestion */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={isInView ? { opacity: 1 } : {}}
+              transition={{ delay: 0.8 }}
+              className="mt-4 p-4 bg-gradient-to-r from-cyan-500/5 to-transparent border border-cyan-500/10 rounded-xl"
+            >
+              <div className="flex items-start gap-3">
+                <div className="w-6 h-6 rounded-lg bg-cyan-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <svg className="w-3.5 h-3.5 text-cyan-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-xs text-cyan-400 mb-0.5">Try next week</p>
+                  <p className="text-sm text-zinc-400">
+                    Open each topic with a "what if" scenario — your students engage 2x more with hypotheticals.
+                  </p>
+                </div>
+              </div>
+            </motion.div>
           </div>
         </div>
       </motion.div>
@@ -486,12 +571,6 @@ function PrivacyBadges() {
           <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
         </svg>
         Recordings deleted in 24h
-      </span>
-      <span className="flex items-center gap-2">
-        <svg className="w-4 h-4 text-emerald-500" fill="currentColor" viewBox="0 0 20 20">
-          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-        </svg>
-        GDPR & SOC 2
       </span>
     </div>
   );
