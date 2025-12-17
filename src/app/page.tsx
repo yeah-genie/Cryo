@@ -559,13 +559,14 @@ function ConnectDemo() {
 // ============================================
 function PrivacyBadges() {
   return (
-    <div className="flex flex-wrap items-center justify-center gap-6 text-sm text-zinc-500">
+    <div className="flex flex-col sm:flex-row items-center justify-center gap-4 text-sm text-zinc-500">
       <span className="flex items-center gap-2">
         <svg className="w-4 h-4 text-cyan-500" fill="currentColor" viewBox="0 0 20 20">
           <path fillRule="evenodd" d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z" clipRule="evenodd" />
         </svg>
         End-to-end encrypted
       </span>
+      <span className="hidden sm:block text-zinc-700">·</span>
       <span className="flex items-center gap-2">
         <svg className="w-4 h-4 text-emerald-500" fill="currentColor" viewBox="0 0 20 20">
           <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
