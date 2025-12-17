@@ -4,23 +4,26 @@ import { useState, useEffect, useRef } from "react";
 import { motion, useInView, useScroll, useTransform, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 
-// Icons - Actual brand logos
+// Zoom logo - accurate brand style
 function ZoomIcon() {
   return (
     <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
-      <rect width="24" height="24" rx="5" fill="#2D8CFF"/>
-      <path d="M5 8.5C5 7.67 5.67 7 6.5 7h7c.83 0 1.5.67 1.5 1.5v5c0 .83-.67 1.5-1.5 1.5h-7c-.83 0-1.5-.67-1.5-1.5v-5z" fill="white"/>
-      <path d="M15 10l4-2v6l-4-2v-2z" fill="white"/>
+      <rect width="24" height="24" rx="4" fill="#2D8CFF"/>
+      <path d="M4.5 8C4.5 7.17 5.17 6.5 6 6.5h8c.83 0 1.5.67 1.5 1.5v6c0 .83-.67 1.5-1.5 1.5H6c-.83 0-1.5-.67-1.5-1.5V8z" fill="white"/>
+      <path d="M16 9.5l3.5-2v7l-3.5-2v-3z" fill="white"/>
     </svg>
   );
 }
 
+// Google Meet logo - accurate brand style  
 function MeetIcon() {
   return (
     <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
-      <path d="M12 1.5C6.2 1.5 1.5 6.2 1.5 12S6.2 22.5 12 22.5 22.5 17.8 22.5 12 17.8 1.5 12 1.5z" fill="#00897B"/>
-      <path d="M7 9c0-.55.45-1 1-1h5c.55 0 1 .45 1 1v4c0 .55-.45 1-1 1H8c-.55 0-1-.45-1-1V9z" fill="white"/>
-      <path d="M14 10.5l3-1.5v4l-3-1.5v-1z" fill="white"/>
+      <path d="M3 6.5A2.5 2.5 0 015.5 4h8A2.5 2.5 0 0116 6.5v2l4.4-2.93a1 1 0 011.6.8v11.26a1 1 0 01-1.6.8L16 15.5v2a2.5 2.5 0 01-2.5 2.5h-8A2.5 2.5 0 013 17.5v-11z" fill="#00AC47"/>
+      <path d="M16 8.5l5.4-3.6a1 1 0 011.6.8v12.6a1 1 0 01-1.6.8L16 15.5v-7z" fill="#00832D"/>
+      <path d="M3 12h13v5.5a2.5 2.5 0 01-2.5 2.5h-8A2.5 2.5 0 013 17.5V12z" fill="#00AC47"/>
+      <path d="M3 6.5A2.5 2.5 0 015.5 4h8A2.5 2.5 0 0116 6.5V12H3V6.5z" fill="#4285F4"/>
+      <path d="M8 9a2 2 0 114 0 2 2 0 01-4 0z" fill="white"/>
     </svg>
   );
 }
@@ -33,32 +36,10 @@ function UploadIcon() {
   );
 }
 
-// Animated cursor component
-function AnimatedCursor({ x, y, clicking }: { x: number; y: number; clicking: boolean }) {
-  return (
-    <motion.div
-      className="absolute pointer-events-none z-50"
-      animate={{ x, y, scale: clicking ? 0.9 : 1 }}
-      transition={{ type: "spring", damping: 25, stiffness: 300 }}
-    >
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-        <path d="M5.5 3.21V20.8c0 .45.54.67.85.35l4.86-4.86a.5.5 0 01.35-.15h6.87c.48 0 .72-.58.38-.92L6.35 2.84a.5.5 0 00-.85.37z" fill="white" stroke="black" strokeWidth="1.5"/>
-      </svg>
-      {clicking && (
-        <motion.div
-          initial={{ scale: 0, opacity: 1 }}
-          animate={{ scale: 2, opacity: 0 }}
-          className="absolute top-0 left-0 w-6 h-6 rounded-full bg-cyan-500/30"
-        />
-      )}
-    </motion.div>
-  );
-}
-
 // macOS window header
-function WindowHeader({ title }: { title: string }) {
+function WindowHeader({ title, variant = "default" }: { title: string; variant?: "default" | "dark" }) {
   return (
-    <div className="flex items-center gap-2 px-4 py-3 border-b border-zinc-800/80 bg-zinc-900/50">
+    <div className={`flex items-center gap-2 px-4 py-3 border-b ${variant === "dark" ? "border-zinc-800 bg-zinc-950" : "border-zinc-800/80 bg-zinc-900/50"}`}>
       <div className="flex gap-1.5">
         <div className="w-3 h-3 rounded-full bg-[#ff5f57]" />
         <div className="w-3 h-3 rounded-full bg-[#febc2e]" />
@@ -69,227 +50,376 @@ function WindowHeader({ title }: { title: string }) {
   );
 }
 
-// Interactive How It Works with cursor animation
-function HowItWorks() {
-  const [activeStep, setActiveStep] = useState(0);
-  const [cursorPos, setCursorPos] = useState({ x: 200, y: 150 });
-  const [clicking, setClicking] = useState(false);
+// ============================================
+// WOW 1: TIMELINE - Chemistry Lesson
+// ============================================
+function TimelineDemo() {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-100px" });
+  const [activeMarker, setActiveMarker] = useState<number | null>(null);
+  const [progress, setProgress] = useState(0);
+
+  const markers = [
+    { 
+      time: "03:24", 
+      position: 8, 
+      type: "insight",
+      title: "Analogy clicked",
+      detail: "\"Electrons sharing = friends sharing pizza\"",
+      impact: "+180% engagement"
+    },
+    { 
+      time: "15:42", 
+      position: 35, 
+      type: "warning",
+      title: "Attention dropped",
+      detail: "Started listing exceptions",
+      impact: "Consider a visual break"
+    },
+    { 
+      time: "28:15", 
+      position: 63, 
+      type: "insight",
+      title: "Best explanation",
+      detail: "Drew molecules on whiteboard",
+      impact: "3.2x retention vs verbal"
+    },
+    { 
+      time: "41:30", 
+      position: 92, 
+      type: "insight",
+      title: "Student breakthrough",
+      detail: "Asked follow-up question",
+      impact: "Deep understanding confirmed"
+    },
+  ];
 
   useEffect(() => {
     if (!isInView) return;
-    
-    const sequence = async () => {
-      // Step 1: Connect - click Zoom
-      await new Promise(r => setTimeout(r, 1000));
-      setCursorPos({ x: 120, y: 80 });
-      await new Promise(r => setTimeout(r, 500));
-      setClicking(true);
-      await new Promise(r => setTimeout(r, 200));
-      setClicking(false);
-      
-      // Step 2: Analyze
-      await new Promise(r => setTimeout(r, 2000));
-      setActiveStep(1);
-      setCursorPos({ x: 200, y: 150 });
-      
-      // Step 3: Learn
-      await new Promise(r => setTimeout(r, 3000));
-      setActiveStep(2);
-      setCursorPos({ x: 150, y: 200 });
-      await new Promise(r => setTimeout(r, 500));
-      setClicking(true);
-      await new Promise(r => setTimeout(r, 200));
-      setClicking(false);
-      
-      // Loop
-      await new Promise(r => setTimeout(r, 4000));
-      setActiveStep(0);
-      setCursorPos({ x: 200, y: 150 });
-    };
-    
-    sequence();
-    const interval = setInterval(sequence, 12000);
+    const interval = setInterval(() => {
+      setProgress(p => p >= 100 ? 0 : p + 0.5);
+    }, 50);
     return () => clearInterval(interval);
   }, [isInView]);
 
-  const steps = [
-    { title: "Connect", desc: "Link your Zoom account or upload session recordings" },
-    { title: "Analyze", desc: "AI processes speech patterns, engagement, and clarity" },
-    { title: "Learn", desc: "See exactly which explanations worked best" },
+  return (
+    <div ref={ref} className="relative">
+      <div className="relative bg-[#0a0a0a] border border-zinc-800 rounded-2xl overflow-hidden">
+        <WindowHeader title="Chemistry — Covalent Bonds" variant="dark" />
+        
+        <div className="p-8">
+          {/* Timeline container */}
+          <div className="relative mb-8">
+            {/* Time labels */}
+            <div className="flex justify-between text-xs text-zinc-600 mb-3">
+              <span>0:00</span>
+              <span>45:00</span>
+            </div>
+            
+            {/* Timeline bar */}
+            <div className="relative h-2 bg-zinc-900 rounded-full overflow-hidden">
+              {/* Progress */}
+              <motion.div
+                className="absolute inset-y-0 left-0 bg-gradient-to-r from-cyan-600 to-cyan-400 rounded-full"
+                style={{ width: `${progress}%` }}
+              />
+              
+              {/* Markers */}
+              {markers.map((marker, i) => (
+                <motion.button
+                  key={i}
+                  initial={{ scale: 0 }}
+                  animate={isInView ? { scale: 1 } : {}}
+                  transition={{ delay: 0.3 + i * 0.1 }}
+                  className={`absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full cursor-pointer transition-transform hover:scale-125 ${
+                    marker.type === "insight" 
+                      ? "bg-emerald-500 shadow-lg shadow-emerald-500/30" 
+                      : "bg-amber-500 shadow-lg shadow-amber-500/30"
+                  }`}
+                  style={{ left: `${marker.position}%`, marginLeft: -8 }}
+                  onMouseEnter={() => setActiveMarker(i)}
+                  onMouseLeave={() => setActiveMarker(null)}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Marker detail popup */}
+          <AnimatePresence mode="wait">
+            {activeMarker !== null && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className={`p-4 rounded-xl border ${
+                  markers[activeMarker].type === "insight"
+                    ? "bg-emerald-500/5 border-emerald-500/20"
+                    : "bg-amber-500/5 border-amber-500/20"
+                }`}
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`text-xs px-2 py-0.5 rounded ${
+                        markers[activeMarker].type === "insight"
+                          ? "bg-emerald-500/20 text-emerald-400"
+                          : "bg-amber-500/20 text-amber-400"
+                      }`}>
+                        {markers[activeMarker].time}
+                      </span>
+                      <span className={`text-sm font-medium ${
+                        markers[activeMarker].type === "insight" ? "text-emerald-300" : "text-amber-300"
+                      }`}>
+                        {markers[activeMarker].title}
+                      </span>
+                    </div>
+                    <p className="text-zinc-400 text-sm">{markers[activeMarker].detail}</p>
+                  </div>
+                  <span className={`text-xs ${
+                    markers[activeMarker].type === "insight" ? "text-emerald-400" : "text-amber-400"
+                  }`}>
+                    {markers[activeMarker].impact}
+                  </span>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Default state */}
+          {activeMarker === null && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="text-center text-zinc-600 text-sm py-4"
+            >
+              Hover on markers to see insights
+            </motion.div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================
+// WOW 2: BEFORE/AFTER - Physics Lesson
+// ============================================
+function BeforeAfterDemo() {
+  const ref = useRef(null);
+  const isInView = useInView(ref, { once: true, margin: "-100px" });
+  const [showAfter, setShowAfter] = useState(false);
+
+  useEffect(() => {
+    if (!isInView) return;
+    const timer = setTimeout(() => setShowAfter(true), 1500);
+    return () => clearTimeout(timer);
+  }, [isInView]);
+
+  return (
+    <div ref={ref} className="relative">
+      <div className="grid md:grid-cols-2 gap-4">
+        {/* BEFORE */}
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={isInView ? { opacity: 1, x: 0 } : {}}
+          className={`relative bg-[#0a0a0a] border rounded-2xl overflow-hidden transition-all duration-500 ${
+            showAfter ? "border-zinc-800 opacity-60" : "border-zinc-700"
+          }`}
+        >
+          <div className="px-4 py-3 border-b border-zinc-800 flex items-center justify-between">
+            <span className="text-xs text-zinc-500">Physics — Newton's Laws</span>
+            <span className="text-xs text-red-400/80 bg-red-500/10 px-2 py-0.5 rounded">Before</span>
+          </div>
+          
+          <div className="p-6 space-y-4">
+            <div className="font-mono text-sm text-zinc-400 p-3 bg-zinc-900/50 rounded-lg border border-zinc-800">
+              "Newton's second law states that F equals m times a, where F is force, m is mass, and a is acceleration..."
+            </div>
+            
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs">
+                <span className="text-zinc-500">Student engagement</span>
+                <span className="text-red-400">34%</span>
+              </div>
+              <div className="h-2 bg-zinc-900 rounded-full overflow-hidden">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={isInView ? { width: "34%" } : {}}
+                  transition={{ duration: 1, delay: 0.5 }}
+                  className="h-full bg-red-500/60 rounded-full"
+                />
+              </div>
+            </div>
+            
+            <p className="text-xs text-zinc-600">
+              Student response: "I don't get why that matters"
+            </p>
+          </div>
+        </motion.div>
+
+        {/* AFTER */}
+        <motion.div
+          initial={{ opacity: 0, x: 20 }}
+          animate={isInView ? { opacity: 1, x: 0 } : {}}
+          transition={{ delay: 0.3 }}
+          className={`relative bg-[#0a0a0a] border rounded-2xl overflow-hidden transition-all duration-500 ${
+            showAfter ? "border-emerald-500/30 shadow-lg shadow-emerald-500/5" : "border-zinc-800"
+          }`}
+        >
+          <div className="px-4 py-3 border-b border-zinc-800 flex items-center justify-between">
+            <span className="text-xs text-zinc-500">Physics — Newton's Laws</span>
+            <span className="text-xs text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">After</span>
+          </div>
+          
+          <div className="p-6 space-y-4">
+            <div className="font-mono text-sm text-zinc-300 p-3 bg-emerald-500/5 rounded-lg border border-emerald-500/20">
+              "Push this textbook across the desk. Feel how hard that was? Now try with your pencil. Easier, right? That's mass affecting force."
+            </div>
+            
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs">
+                <span className="text-zinc-500">Student engagement</span>
+                <span className="text-emerald-400">91%</span>
+              </div>
+              <div className="h-2 bg-zinc-900 rounded-full overflow-hidden">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={showAfter ? { width: "91%" } : {}}
+                  transition={{ duration: 1 }}
+                  className="h-full bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-full"
+                />
+              </div>
+            </div>
+            
+            <p className="text-xs text-emerald-400/80">
+              Student response: "Oh! So heavier things need more force!"
+            </p>
+          </div>
+        </motion.div>
+      </div>
+
+      {/* Insight badge */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={showAfter ? { opacity: 1, y: 0 } : {}}
+        transition={{ delay: 0.5 }}
+        className="mt-6 p-4 bg-gradient-to-r from-cyan-500/5 to-emerald-500/5 border border-cyan-500/20 rounded-xl text-center"
+      >
+        <p className="text-sm text-zinc-300">
+          <span className="text-cyan-400 font-medium">Chalk found:</span> Tactile demonstrations increase retention by <span className="text-emerald-400 font-semibold">2.7x</span> compared to formula-first approaches
+        </p>
+      </motion.div>
+    </div>
+  );
+}
+
+// ============================================
+// WOW 3: WEEKLY REPORT - History Lesson
+// ============================================
+function WeeklyReportDemo() {
+  const ref = useRef(null);
+  const isInView = useInView(ref, { once: true, margin: "-100px" });
+  const [animateGraph, setAnimateGraph] = useState(false);
+
+  useEffect(() => {
+    if (isInView) {
+      setTimeout(() => setAnimateGraph(true), 500);
+    }
+  }, [isInView]);
+
+  const weekData = [
+    { day: "Mon", value: 62 },
+    { day: "Tue", value: 71 },
+    { day: "Wed", value: 68 },
+    { day: "Thu", value: 85 },
+    { day: "Fri", value: 89 },
   ];
 
   return (
-    <div ref={ref} className="grid lg:grid-cols-2 gap-12 items-center">
-      {/* Left: Steps */}
-      <div className="space-y-2">
-        {steps.map((step, i) => (
-          <motion.button
-            key={step.title}
-            onClick={() => setActiveStep(i)}
-            initial={{ opacity: 0, x: -20 }}
-            animate={isInView ? { opacity: 1, x: 0 } : {}}
-            transition={{ delay: i * 0.1 }}
-            className={`w-full text-left p-5 rounded-xl border transition-all duration-300 ${
-              activeStep === i 
-                ? "bg-zinc-900/80 border-zinc-700" 
-                : "bg-transparent border-transparent hover:bg-zinc-900/40"
-            }`}
-          >
-            <div className="flex items-center gap-4">
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-medium transition-colors ${
-                activeStep === i ? "bg-white text-black" : "bg-zinc-800 text-zinc-500"
-              }`}>
-                {i + 1}
-              </div>
-              <div>
-                <h3 className={`font-medium transition-colors ${activeStep === i ? "text-white" : "text-zinc-500"}`}>
-                  {step.title}
-                </h3>
-                <p className={`text-sm mt-0.5 transition-colors ${activeStep === i ? "text-zinc-400" : "text-zinc-600"}`}>
-                  {step.desc}
-                </p>
-              </div>
-            </div>
-          </motion.button>
-        ))}
-      </div>
-
-      {/* Right: Interactive Mockup */}
+    <div ref={ref} className="relative">
+      {/* Email preview container */}
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 30 }}
         animate={isInView ? { opacity: 1, y: 0 } : {}}
-        transition={{ delay: 0.2 }}
-        className="relative"
+        className="relative bg-[#0a0a0a] border border-zinc-800 rounded-2xl overflow-hidden shadow-2xl"
       >
-        <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/10 to-blue-500/10 rounded-2xl blur-xl" />
-        <div className="relative bg-[#111] border border-zinc-800 rounded-2xl overflow-hidden">
-          <WindowHeader title="Chalk" />
+        {/* Email header */}
+        <div className="px-6 py-4 border-b border-zinc-800 bg-zinc-900/30">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center">
+              <span className="text-white font-bold text-xs">C</span>
+            </div>
+            <div>
+              <p className="text-sm text-zinc-300">Your Weekly Teaching Report</p>
+              <p className="text-xs text-zinc-600">From: Chalk Analytics</p>
+            </div>
+          </div>
+        </div>
 
-          {/* Content with cursor */}
-          <div className="p-6 min-h-[320px] relative">
-            <AnimatedCursor x={cursorPos.x} y={cursorPos.y} clicking={clicking} />
-            
-            <AnimatePresence mode="wait">
-              {activeStep === 0 && (
-                <motion.div
-                  key="connect"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className="space-y-3"
-                >
-                  <p className="text-sm text-zinc-500 mb-4">Connect your platform</p>
-                  {[
-                    { name: "Zoom", icon: <ZoomIcon />, color: "text-blue-400" },
-                    { name: "Google Meet", icon: <MeetIcon />, color: "text-green-400" },
-                    { name: "Upload recording", icon: <UploadIcon />, color: "text-zinc-400" },
-                  ].map((platform, i) => (
-                    <motion.div
-                      key={platform.name}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: i * 0.1 }}
-                      className="flex items-center justify-between p-4 bg-zinc-900/50 border border-zinc-800 rounded-lg hover:border-zinc-700 transition-colors cursor-pointer group"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className={platform.color}>{platform.icon}</span>
-                        <span className="text-sm text-zinc-300">{platform.name}</span>
-                      </div>
-                      <svg className="w-4 h-4 text-zinc-600 group-hover:text-zinc-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </motion.div>
-                  ))}
-                </motion.div>
-              )}
+        <div className="p-6 space-y-6">
+          {/* Week summary */}
+          <div className="grid grid-cols-3 gap-4">
+            <div className="text-center">
+              <p className="text-2xl font-bold text-white">5</p>
+              <p className="text-xs text-zinc-500">Sessions</p>
+            </div>
+            <div className="text-center">
+              <p className="text-2xl font-bold text-emerald-400">↑18%</p>
+              <p className="text-xs text-zinc-500">Engagement</p>
+            </div>
+            <div className="text-center">
+              <p className="text-2xl font-bold text-cyan-400">3</p>
+              <p className="text-xs text-zinc-500">Breakthroughs</p>
+            </div>
+          </div>
 
-              {activeStep === 1 && (
-                <motion.div
-                  key="analyze"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className="flex flex-col items-center justify-center h-[280px] space-y-6"
-                >
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse" />
-                    <p className="text-sm text-zinc-400">Analyzing "Physics - Newton's Laws"</p>
-                  </div>
-                  
-                  {/* Waveform centered */}
-                  <div className="flex items-center justify-center gap-1 h-20">
-                    {[...Array(32)].map((_, i) => (
-                      <motion.div
-                        key={i}
-                        initial={{ height: 4 }}
-                        animate={{ height: 8 + Math.sin(i * 0.4) * 24 + Math.random() * 16 }}
-                        transition={{ duration: 0.4, repeat: Infinity, repeatType: "reverse", delay: i * 0.03 }}
-                        className="w-1 bg-gradient-to-t from-cyan-500/30 to-cyan-400 rounded-full"
-                      />
-                    ))}
-                  </div>
+          {/* Graph */}
+          <div className="p-4 bg-zinc-900/50 rounded-xl border border-zinc-800">
+            <p className="text-xs text-zinc-500 mb-4">Student engagement this week</p>
+            <div className="flex items-end justify-between gap-2 h-24">
+              {weekData.map((day, i) => (
+                <div key={day.day} className="flex-1 flex flex-col items-center gap-2">
+                  <motion.div
+                    initial={{ height: 0 }}
+                    animate={animateGraph ? { height: `${day.value}%` } : {}}
+                    transition={{ duration: 0.5, delay: i * 0.1 }}
+                    className={`w-full rounded-t ${
+                      day.value >= 80 
+                        ? "bg-gradient-to-t from-emerald-600 to-emerald-400" 
+                        : "bg-gradient-to-t from-cyan-600 to-cyan-400"
+                    }`}
+                  />
+                  <span className="text-xs text-zinc-600">{day.day}</span>
+                </div>
+              ))}
+            </div>
+          </div>
 
-                  <div className="w-full max-w-xs space-y-2">
-                    <motion.div 
-                      initial={{ width: 0 }}
-                      animate={{ width: "75%" }}
-                      transition={{ duration: 2.5 }}
-                      className="h-1 bg-cyan-500/50 rounded-full"
-                    />
-                    <p className="text-xs text-zinc-600 text-center">Transcribing and analyzing patterns...</p>
-                  </div>
-                </motion.div>
-              )}
+          {/* Best moment */}
+          <div className="p-4 bg-gradient-to-r from-amber-500/5 to-orange-500/5 border border-amber-500/20 rounded-xl">
+            <div className="flex items-center gap-2 mb-2">
+              <svg className="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+              </svg>
+              <span className="text-sm text-amber-300 font-medium">Best Moment This Week</span>
+            </div>
+            <p className="text-sm text-zinc-300 mb-1">
+              History — French Revolution
+            </p>
+            <p className="text-xs text-zinc-400">
+              "What would YOU do if bread cost a month's salary?" — Role-play question triggered 4-minute student discussion
+            </p>
+            <p className="text-xs text-emerald-400 mt-2">
+              2.4x more engagement than lecture-style delivery
+            </p>
+          </div>
 
-              {activeStep === 2 && (
-                <motion.div
-                  key="learn"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className="space-y-3"
-                >
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm text-zinc-400">Physics - Newton's Laws</p>
-                    <span className="text-xs text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded">Done</span>
-                  </div>
-                  
-                  {/* Key insight - WOW moment */}
-                  <div className="p-3 bg-gradient-to-r from-emerald-500/10 to-cyan-500/5 border border-emerald-500/20 rounded-lg">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="w-5 h-5 rounded bg-emerald-500/20 flex items-center justify-center">
-                        <svg className="w-3 h-3 text-emerald-400" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6z" />
-                        </svg>
-                      </div>
-                      <p className="text-xs text-emerald-400">Key insight</p>
-                    </div>
-                    <p className="text-sm text-white">
-                      Real-world demo = <span className="text-cyan-400">2.5x</span> better retention
-                    </p>
-                    <p className="text-xs text-zinc-500 mt-1">
-                      Pushing a book vs. showing equations
-                    </p>
-                  </div>
-
-                  {/* Compact comparison */}
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="p-2.5 bg-emerald-500/5 border border-emerald-500/20 rounded-lg">
-                      <p className="text-xs text-emerald-400">Worked</p>
-                      <p className="text-sm text-zinc-300 mt-0.5">"Push this book"</p>
-                      <p className="text-lg font-semibold text-emerald-400">89%</p>
-                    </div>
-                    <div className="p-2.5 bg-zinc-900/50 border border-zinc-800 rounded-lg">
-                      <p className="text-xs text-zinc-500">Less effective</p>
-                      <p className="text-sm text-zinc-400 mt-0.5">"F = ma means..."</p>
-                      <p className="text-lg font-semibold text-zinc-500">52%</p>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+          {/* Suggestion */}
+          <div className="p-4 bg-zinc-900/30 border border-zinc-800 rounded-xl">
+            <p className="text-xs text-cyan-400 mb-1">Try this next week</p>
+            <p className="text-sm text-zinc-300">
+              Your students respond well to "what if" questions. Try opening each topic with a hypothetical scenario.
+            </p>
           </div>
         </div>
       </motion.div>
@@ -297,229 +427,95 @@ function HowItWorks() {
   );
 }
 
-// Privacy icons
-function VideoIcon() {
-  return (
-    <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z" />
-    </svg>
-  );
-}
-
-function LockIcon() {
-  return (
-    <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
-    </svg>
-  );
-}
-
-function ChartIcon() {
-  return (
-    <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
-    </svg>
-  );
-}
-
-function TrashIcon() {
-  return (
-    <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-    </svg>
-  );
-}
-
-// Interactive Privacy Section - minimal, elegant
-function PrivacySection() {
+// ============================================
+// CONNECT SECTION
+// ============================================
+function ConnectDemo() {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-100px" });
-  const [step, setStep] = useState(0);
-
-  useEffect(() => {
-    if (!isInView) return;
-    const interval = setInterval(() => {
-      setStep(s => (s + 1) % 4);
-    }, 2000);
-    return () => clearInterval(interval);
-  }, [isInView]);
-
-  const steps = [
-    { label: "Upload", icon: <VideoIcon />, desc: "Connect your session" },
-    { label: "Analyze", icon: <LockIcon />, desc: "Encrypted processing" },
-    { label: "Insights", icon: <ChartIcon />, desc: "Text only, no video" },
-    { label: "Deleted", icon: <TrashIcon />, desc: "Within 24 hours" },
-  ];
 
   return (
     <div ref={ref} className="relative">
-      <div className="relative bg-[#111] border border-zinc-800 rounded-2xl overflow-hidden">
-        <WindowHeader title="Data flow" />
+      <div className="relative bg-[#0a0a0a] border border-zinc-800 rounded-2xl overflow-hidden">
+        <WindowHeader title="Connect your platform" variant="dark" />
         
-        <div className="p-8">
-          {/* Minimal flow */}
-          <div className="flex items-center justify-between gap-2 mb-6">
-            {steps.map((item, i) => (
-              <div key={i} className="flex-1 flex flex-col items-center">
-                <motion.div
-                  animate={{ 
-                    scale: step === i ? 1.1 : 1,
-                    opacity: step >= i ? 1 : 0.4
-                  }}
-                  transition={{ duration: 0.3 }}
-                  className={`w-12 h-12 rounded-xl flex items-center justify-center mb-2 transition-colors ${
-                    step === i 
-                      ? "bg-cyan-500/20 text-cyan-400" 
-                      : step > i 
-                        ? "bg-zinc-800 text-zinc-400" 
-                        : "bg-zinc-900 text-zinc-600"
-                  }`}
-                >
-                  {item.icon}
-                </motion.div>
-                <p className={`text-xs font-medium ${step >= i ? "text-zinc-300" : "text-zinc-600"}`}>
-                  {item.label}
-                </p>
-              </div>
-            ))}
-          </div>
-
-          {/* Progress line */}
-          <div className="h-0.5 bg-zinc-800 rounded-full mb-6 overflow-hidden">
+        <div className="p-6 space-y-3">
+          {[
+            { name: "Zoom", icon: <ZoomIcon />, status: "Connect", color: "hover:border-blue-500/30" },
+            { name: "Google Meet", icon: <MeetIcon />, status: "Connect", color: "hover:border-green-500/30" },
+            { name: "Upload recording", icon: <UploadIcon />, status: "Browse", color: "hover:border-zinc-600" },
+          ].map((platform, i) => (
             <motion.div
-              animate={{ width: `${((step + 1) / 4) * 100}%` }}
-              transition={{ duration: 0.5 }}
-              className="h-full bg-gradient-to-r from-cyan-500 to-blue-500"
-            />
-          </div>
-
-          {/* Current step */}
-          <div className="text-center text-sm text-zinc-400 mb-6">
-            {steps[step].desc}
-          </div>
-
-          {/* Trust badges */}
-          <div className="flex items-center justify-center gap-6 text-xs text-zinc-500 pt-4 border-t border-zinc-800/50">
-            <span className="flex items-center gap-1.5">
-              <svg className="w-3.5 h-3.5 text-cyan-500" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z" clipRule="evenodd" />
-              </svg>
-              Encrypted
-            </span>
-            <span className="flex items-center gap-1.5">
-              <svg className="w-3.5 h-3.5 text-emerald-500" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
-              GDPR
-            </span>
-            <span className="flex items-center gap-1.5">
-              <svg className="w-3.5 h-3.5 text-emerald-500" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
-              SOC 2
-            </span>
-          </div>
+              key={platform.name}
+              initial={{ opacity: 0, x: -20 }}
+              animate={isInView ? { opacity: 1, x: 0 } : {}}
+              transition={{ delay: i * 0.1 }}
+              className={`flex items-center justify-between p-4 bg-zinc-900/50 border border-zinc-800 rounded-xl cursor-pointer transition-all ${platform.color}`}
+            >
+              <div className="flex items-center gap-3">
+                {platform.icon}
+                <span className="text-sm text-zinc-300">{platform.name}</span>
+              </div>
+              <span className="text-xs text-zinc-500">{platform.status}</span>
+            </motion.div>
+          ))}
+          
+          <p className="text-xs text-zinc-600 text-center pt-2">
+            Takes 30 seconds. We never store your recordings.
+          </p>
         </div>
       </div>
     </div>
   );
 }
 
-// Metrics Demo with real examples - Spanish lesson
-function MetricsDemo() {
-  const ref = useRef(null);
-  const isInView = useInView(ref, { once: true });
-  const [show, setShow] = useState(false);
-
-  useEffect(() => {
-    if (isInView) setTimeout(() => setShow(true), 300);
-  }, [isInView]);
-
+// ============================================
+// PRIVACY SECTION - Minimal
+// ============================================
+function PrivacyBadges() {
   return (
-    <div ref={ref} className="relative">
-      <div className="relative bg-[#111] border border-zinc-800 rounded-2xl overflow-hidden">
-        <WindowHeader title="Spanish - Past Tense Verbs" />
-        
-        <div className="p-6 space-y-4">
-          {/* Key moment */}
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={show ? { opacity: 1, y: 0 } : {}}
-            className="p-3 bg-gradient-to-r from-amber-500/10 to-orange-500/5 border border-amber-500/20 rounded-lg"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center">
-                <svg className="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div>
-                <p className="text-sm text-amber-200 font-medium">Breakthrough at 12:15</p>
-                <p className="text-xs text-zinc-400">"Hablar becomes hablé" — engagement +280%</p>
-              </div>
-            </div>
-          </motion.div>
-
-          {/* Talk ratio - compact */}
-          <div>
-            <div className="flex justify-between text-sm mb-1.5">
-              <span className="text-zinc-500">Talk ratio</span>
-              <span className="text-zinc-400">55% / 45%</span>
-            </div>
-            <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden flex">
-              <motion.div
-                initial={{ width: 0 }}
-                animate={show ? { width: "55%" } : {}}
-                transition={{ duration: 1 }}
-                className="bg-cyan-500 rounded-full"
-              />
-              <motion.div
-                initial={{ width: 0 }}
-                animate={show ? { width: "45%" } : {}}
-                transition={{ duration: 1, delay: 0.2 }}
-                className="bg-emerald-500/60 rounded-full"
-              />
-            </div>
-            <p className="text-xs text-emerald-400 mt-1.5 flex items-center gap-1">
-              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
-              Great balance
-            </p>
-          </div>
-
-          {/* Comparison - compact */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={show ? { opacity: 1 } : {}}
-            transition={{ delay: 0.5 }}
-            className="grid grid-cols-2 gap-2"
-          >
-            <div className="p-3 bg-emerald-500/5 border border-emerald-500/20 rounded-lg">
-              <p className="text-xs text-emerald-400 mb-1">Worked</p>
-              <p className="text-sm text-zinc-300">"Sing the endings!"</p>
-              <p className="text-lg font-semibold text-emerald-400 mt-1">91%</p>
-            </div>
-            <div className="p-3 bg-zinc-900/50 border border-zinc-800 rounded-lg">
-              <p className="text-xs text-zinc-500 mb-1">Less effective</p>
-              <p className="text-sm text-zinc-400">"Memorize the chart"</p>
-              <p className="text-lg font-semibold text-zinc-500 mt-1">38%</p>
-            </div>
-          </motion.div>
-        </div>
-      </div>
+    <div className="flex flex-wrap items-center justify-center gap-6 text-sm text-zinc-500">
+      <span className="flex items-center gap-2">
+        <svg className="w-4 h-4 text-cyan-500" fill="currentColor" viewBox="0 0 20 20">
+          <path fillRule="evenodd" d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z" clipRule="evenodd" />
+        </svg>
+        End-to-end encrypted
+      </span>
+      <span className="flex items-center gap-2">
+        <svg className="w-4 h-4 text-emerald-500" fill="currentColor" viewBox="0 0 20 20">
+          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+        </svg>
+        Recordings deleted in 24h
+      </span>
+      <span className="flex items-center gap-2">
+        <svg className="w-4 h-4 text-emerald-500" fill="currentColor" viewBox="0 0 20 20">
+          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+        </svg>
+        GDPR & SOC 2
+      </span>
     </div>
   );
 }
 
+// ============================================
 // FAQ
+// ============================================
 function FAQ() {
   const [open, setOpen] = useState<number | null>(null);
   
   const items = [
-    { q: "How does the analysis work?", a: "Connect Zoom or upload recordings. Our AI transcribes the session, identifies key teaching moments, and measures student engagement through response patterns and question quality." },
-    { q: "What makes this different from just reviewing recordings?", a: "We surface the moments that matter. Instead of watching 60 minutes, you see exactly which explanations worked (with timestamps) and why. It's like having a teaching coach watch every session." },
-    { q: "Is my students' data safe?", a: "Yes. We only analyze speech patterns and timing — no student faces or personal data. Recordings are deleted within 24 hours. You own all insights." },
+    { 
+      q: "How accurate is the analysis?", 
+      a: "Our AI is trained on thousands of tutoring sessions. It identifies engagement patterns through speech cadence, question quality, and response timing with 94% accuracy." 
+    },
+    { 
+      q: "What subjects does it work for?", 
+      a: "Any subject. We analyze teaching patterns, not content. Whether you teach calculus or creative writing, Chalk identifies what makes your explanations effective." 
+    },
+    { 
+      q: "Is my students' data safe?", 
+      a: "Yes. We analyze speech patterns only — no faces, no personal data. Recordings are processed and deleted within 24 hours. You own all insights." 
+    },
   ];
 
   return (
@@ -531,9 +527,15 @@ function FAQ() {
             className="w-full flex items-center justify-between p-5 text-left hover:bg-zinc-900/30 transition-colors"
           >
             <span className="text-zinc-300">{item.q}</span>
-            <svg className={`w-5 h-5 text-zinc-600 transition-transform ${open === i ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <motion.svg 
+              animate={{ rotate: open === i ? 180 : 0 }}
+              className="w-5 h-5 text-zinc-600" 
+              fill="none" 
+              stroke="currentColor" 
+              viewBox="0 0 24 24"
+            >
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 9l-7 7-7-7" />
-            </svg>
+            </motion.svg>
           </button>
           <AnimatePresence>
             {open === i && (
@@ -553,6 +555,9 @@ function FAQ() {
   );
 }
 
+// ============================================
+// MAIN PAGE
+// ============================================
 export default function LandingPage() {
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "success">("idle");
@@ -677,36 +682,62 @@ export default function LandingPage() {
         </div>
       </motion.section>
 
-      {/* How it works */}
+      {/* WOW 1: Timeline */}
       <section className="py-32 px-6">
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center mb-16">
+            <p className="text-sm text-cyan-400 mb-3">Your lesson, decoded</p>
+            <h2 className="text-3xl sm:text-4xl font-semibold text-white">See your entire session at a glance</h2>
+            <p className="text-zinc-500 mt-3 max-w-lg mx-auto">
+              Every breakthrough moment. Every attention dip. All mapped on a timeline.
+            </p>
+          </div>
+          <TimelineDemo />
+        </div>
+      </section>
+
+      {/* WOW 2: Before/After */}
+      <section className="py-32 px-6 border-t border-zinc-800/50">
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center mb-16">
+            <p className="text-sm text-cyan-400 mb-3">Same concept, different result</p>
+            <h2 className="text-3xl sm:text-4xl font-semibold text-white">Know exactly what to change</h2>
+            <p className="text-zinc-500 mt-3 max-w-lg mx-auto">
+              Compare how different explanations perform. Data, not guesswork.
+            </p>
+          </div>
+          <BeforeAfterDemo />
+        </div>
+      </section>
+
+      {/* WOW 3: Weekly Report */}
+      <section className="py-32 px-6 border-t border-zinc-800/50">
+        <div className="max-w-2xl mx-auto">
+          <div className="text-center mb-16">
+            <p className="text-sm text-cyan-400 mb-3">Every week, get smarter</p>
+            <h2 className="text-3xl sm:text-4xl font-semibold text-white">Your teaching, improving</h2>
+            <p className="text-zinc-500 mt-3 max-w-lg mx-auto">
+              Weekly reports with your best moments, growth trends, and personalized tips.
+            </p>
+          </div>
+          <WeeklyReportDemo />
+        </div>
+      </section>
+
+      {/* Connect + Privacy */}
+      <section className="py-32 px-6 border-t border-zinc-800/50">
         <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-16">
-            <p className="text-sm text-cyan-400 mb-3">How it works</p>
-            <h2 className="text-3xl font-semibold text-white">Three steps to better teaching</h2>
+          <div className="grid md:grid-cols-2 gap-12 items-center">
+            <div>
+              <p className="text-sm text-cyan-400 mb-3">Get started in seconds</p>
+              <h2 className="text-3xl font-semibold text-white mb-4">Connect, then forget about it</h2>
+              <p className="text-zinc-500 mb-6">
+                Link your Zoom or Google Meet. We'll analyze sessions automatically. No extra work.
+              </p>
+              <PrivacyBadges />
+            </div>
+            <ConnectDemo />
           </div>
-          <HowItWorks />
-        </div>
-      </section>
-
-      {/* What you'll see */}
-      <section className="py-32 px-6 border-t border-zinc-800/50">
-        <div className="max-w-3xl mx-auto">
-          <div className="text-center mb-16">
-            <p className="text-sm text-cyan-400 mb-3">Real insights</p>
-            <h2 className="text-3xl font-semibold text-white">See what you've been missing</h2>
-          </div>
-          <MetricsDemo />
-        </div>
-      </section>
-
-      {/* Privacy */}
-      <section className="py-32 px-6 border-t border-zinc-800/50">
-        <div className="max-w-3xl mx-auto">
-          <div className="text-center mb-16">
-            <p className="text-sm text-cyan-400 mb-3">Privacy first</p>
-            <h2 className="text-3xl font-semibold text-white">Your recordings stay private</h2>
-          </div>
-          <PrivacySection />
         </div>
       </section>
 
