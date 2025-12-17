@@ -1,16 +1,22 @@
 import { NextRequest } from "next/server";
-import OpenAI from "openai";
-import { GoogleGenerativeAI } from "@google/generative-ai";
-import { Resend } from "resend";
 
-// Initialize clients
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Lazy initialization to avoid build-time errors
+function getOpenAI() {
+  const OpenAI = require("openai").default;
+  return new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  });
+}
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+function getGemini() {
+  const { GoogleGenerativeAI } = require("@google/generative-ai");
+  return new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+}
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+function getResend() {
+  const { Resend } = require("resend");
+  return new Resend(process.env.RESEND_API_KEY);
+}
 
 // Helper to send SSE updates
 function createSSEResponse() {
@@ -64,6 +70,7 @@ export async function POST(request: NextRequest) {
       // Create a File object for OpenAI
       const audioFile = new File([buffer], file.name, { type: file.type });
 
+      const openai = getOpenAI();
       const transcription = await openai.audio.transcriptions.create({
         file: audioFile,
         model: "whisper-1",
@@ -77,6 +84,7 @@ export async function POST(request: NextRequest) {
       // Step 3: Analyze with Gemini
       send({ status: "analyzing", progress: 60 });
 
+      const genAI = getGemini();
       const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
       const analysisPrompt = `You are an expert teaching coach analyzing a tutoring session transcript.
@@ -166,6 +174,7 @@ Return ONLY valid JSON, no markdown or explanation.`;
       send({ status: "sending_email", progress: 90 });
 
       try {
+        const resend = getResend();
         await resend.emails.send({
           from: "Chalk <hello@briefix.app>",
           to: email,
