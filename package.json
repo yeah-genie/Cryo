@@ -15,12 +15,14 @@
     "@google/generative-ai": "^0.24.1",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.88.0",
+    "clsx": "^2.1.1",
     "framer-motion": "^12.23.26",
     "next": "16.0.10",
     "openai": "^6.14.0",
     "react": "19.2.1",
     "react-dom": "19.2.1",
     "resend": "^6.6.0",
+    "tailwind-merge": "^3.4.0",
     "zustand": "^5.0.9"
   },
   "devDependencies": {

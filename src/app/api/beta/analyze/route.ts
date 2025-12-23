@@ -93,7 +93,7 @@ TRANSCRIPT:
 ${transcript}
 
 SEGMENTS WITH TIMESTAMPS:
-${segments.map(s => `[${formatTime(s.start)}] ${s.text}`).join("\n")}
+${segments.map((s: { start: number; text: string }) => `[${formatTime(s.start)}] ${s.text}`).join("\n")}
 
 Analyze this tutoring session and provide insights in the following JSON format:
 
