@@ -7,66 +7,77 @@ import {
   Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Linking from 'expo-linking';
-import Animated, {
-  FadeInDown,
-  FadeInUp,
-  Easing,
-  useSharedValue,
-  withDelay,
-  withTiming,
-} from 'react-native-reanimated';
+import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 
 import Colors, { spacing, typography, radius } from '@/constants/Colors';
 import { useColorScheme } from '@/components/useColorScheme';
 import { GlowCard, GradientBorderCard } from '@/components/ui/GlowCard';
 import { NeonButton } from '@/components/ui/NeonButton';
 import { Avatar } from '@/components/ui/Avatar';
+import { Toast, useToast } from '@/components/ui/Toast';
 import {
   ShareIcon,
   FireIcon,
+  TargetIcon,
+  CrownIcon,
+  TrendingUpIcon,
+  DiamondIcon,
+  LockIcon,
   VerifiedBadge,
   CheckCircleIcon,
 } from '@/components/Icons';
+import { MOCK_BADGES, MOCK_STATS, generateCalendarData } from '@/data/mockData';
+import { Badge } from '@/data/types';
 
 const { width } = Dimensions.get('window');
-
-// 캘린더 데이터 생성 (12주)
-const generateCalendarData = () => {
-  const days = [];
-  for (let i = 0; i < 84; i++) {
-    const rand = Math.random();
-    days.push(rand > 0.65 ? (rand > 0.85 ? 3 : rand > 0.75 ? 2 : 1) : 0);
-  }
-  return days;
-};
-
 const CALENDAR_DATA = generateCalendarData();
 
-const STATS = {
-  totalLessons: 42,
-  totalStudents: 5,
-  avgLevel: 78,
-  streak: 12,
+// 배지 아이콘 맵핑
+const BADGE_ICONS: Record<Badge['icon'], React.FC<{ size: number; color: string }>> = {
+  fire: FireIcon,
+  target: TargetIcon,
+  crown: CrownIcon,
+  trending: TrendingUpIcon,
+  diamond: DiamondIcon,
+  star: FireIcon, // fallback
+  award: CrownIcon, // fallback
 };
 
-const BADGES = [
-  { icon: '🔥', label: '10일 연속', color: 'orange', earned: true },
-  { icon: '🎯', label: '첫 수업', color: 'mint', earned: true },
-  { icon: '👑', label: '성실왕', color: 'purple', earned: true },
-  { icon: '📈', label: '목표 달성', color: 'orange', earned: false },
-  { icon: '💎', label: '프리미엄', color: 'mint', earned: false },
-];
+// 배지 컬러 맵핑
+function getBadgeColor(color: Badge['color'], colors: any): string {
+  switch (color) {
+    case 'orange': return colors.tint;
+    case 'mint': return colors.tintSecondary;
+    case 'purple': return colors.tintAccent;
+    case 'yellow': return colors.warning;
+    case 'blue': return colors.info;
+    default: return colors.tint;
+  }
+}
 
 export default function PortfolioScreen() {
   const colorScheme = useColorScheme() ?? 'dark';
   const colors = Colors[colorScheme];
+  const insets = useSafeAreaInsets();
+  const toast = useToast();
 
   const handleShare = async () => {
-    const message = `📊 과외 포트폴리오\n\n${STATS.totalLessons}회 수업 완료\n${STATS.totalStudents}명 학생 관리\n평균 달성율 ${STATS.avgLevel}%\n\n#Chalk 인증 데이터`;
+    const message = `📊 과외 포트폴리오\n\n${MOCK_STATS.totalLessons}회 수업 완료\n${MOCK_STATS.totalStudents}명 학생 관리\n평균 달성율 ${MOCK_STATS.avgLevel}%\n\n#Chalk 인증 데이터`;
     const url = `kakaotalk://send?text=${encodeURIComponent(message)}`;
-    const supported = await Linking.canOpenURL(url);
-    if (supported) await Linking.openURL(url);
+    
+    try {
+      const supported = await Linking.canOpenURL(url);
+      if (supported) {
+        await Linking.openURL(url);
+        toast.success('공유 완료', '카카오톡으로 이동했어요');
+      } else {
+        toast.info('복사 완료', '메시지가 클립보드에 복사되었어요');
+      }
+    } catch (error) {
+      toast.error('오류 발생', '다시 시도해주세요');
+    }
   };
 
   const getCalendarColor = (level: number) => {
@@ -76,9 +87,20 @@ export default function PortfolioScreen() {
     return colors.tint;
   };
 
+  const tabBarHeight = 64 + Math.max(insets.bottom, 16) + 20;
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Background gradient */}
+      {/* Toast */}
+      <Toast
+        visible={toast.toast.visible}
+        type={toast.toast.type}
+        title={toast.toast.title}
+        message={toast.toast.message}
+        onDismiss={toast.hideToast}
+      />
+
+      {/* Background */}
       <View style={styles.glowContainer}>
         <LinearGradient
           colors={[
@@ -97,7 +119,10 @@ export default function PortfolioScreen() {
       </View>
 
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[
+          styles.content,
+          { paddingTop: insets.top + spacing.lg, paddingBottom: tabBarHeight },
+        ]}
         showsVerticalScrollIndicator={false}
       >
         {/* Profile Header */}
@@ -113,10 +138,10 @@ export default function PortfolioScreen() {
                 <Text style={[styles.profileName, { color: colors.text }]}>
                   나의 포트폴리오
                 </Text>
-                <VerifiedBadge size={20} />
+                <VerifiedBadge size={20} color={colors.tintSecondary} />
               </View>
               <Text style={[styles.profileBio, { color: colors.textMuted }]}>
-                수학 전문 과외 · {STATS.streak}일 연속 기록 중
+                수학 전문 과외 · {MOCK_STATS.streak}일 연속 기록 중
               </Text>
             </View>
           </View>
@@ -129,21 +154,21 @@ export default function PortfolioScreen() {
         >
           <View style={styles.statsGrid}>
             <StatCard
-              value={STATS.totalLessons}
+              value={MOCK_STATS.totalLessons}
               label="총 수업"
               color={colors.tint}
               colors={colors}
               delay={300}
             />
             <StatCard
-              value={STATS.totalStudents}
+              value={MOCK_STATS.totalStudents}
               label="학생 수"
               color={colors.tintSecondary}
               colors={colors}
               delay={400}
             />
             <StatCard
-              value={STATS.avgLevel}
+              value={MOCK_STATS.avgLevel}
               label="평균 달성"
               suffix="%"
               color={colors.tintAccent}
@@ -151,10 +176,10 @@ export default function PortfolioScreen() {
               delay={500}
             />
             <StatCard
-              value={STATS.streak}
+              value={MOCK_STATS.streak}
               label="연속 기록"
-              icon={<FireIcon size={18} color="#FF6B35" />}
-              color="#FF6B35"
+              icon={<FireIcon size={18} color={colors.tint} />}
+              color={colors.tint}
               colors={colors}
               delay={600}
             />
@@ -173,9 +198,8 @@ export default function PortfolioScreen() {
           <GlowCard variant="glass">
             <View style={styles.calendarGrid}>
               {CALENDAR_DATA.map((level, idx) => (
-                <Animated.View
+                <View
                   key={idx}
-                  entering={FadeInDown.delay(400 + idx * 3).springify()}
                   style={[
                     styles.calendarCell,
                     { backgroundColor: getCalendarColor(level) },
@@ -197,7 +221,7 @@ export default function PortfolioScreen() {
           </GlowCard>
         </Animated.View>
 
-        {/* Badges */}
+        {/* Badges - SVG 아이콘 사용 */}
         <Animated.View 
           entering={FadeInDown.delay(400).springify()}
           style={styles.section}
@@ -208,42 +232,55 @@ export default function PortfolioScreen() {
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View style={styles.badgesRow}>
-              {BADGES.map((badge, idx) => (
-                <Animated.View
-                  key={idx}
-                  entering={FadeInDown.delay(450 + idx * 50).springify()}
-                >
-                  <View
-                    style={[
-                      styles.badge,
-                      { 
-                        backgroundColor: badge.earned 
-                          ? getBadgeColor(badge.color, colors) + '20'
-                          : colors.backgroundTertiary,
-                        borderColor: badge.earned 
-                          ? getBadgeColor(badge.color, colors)
-                          : colors.border,
-                        opacity: badge.earned ? 1 : 0.5,
-                      },
-                    ]}
+              {MOCK_BADGES.map((badge, idx) => {
+                const IconComponent = BADGE_ICONS[badge.icon];
+                const badgeColor = getBadgeColor(badge.color, colors);
+                
+                return (
+                  <Animated.View
+                    key={badge.id}
+                    entering={FadeInDown.delay(450 + idx * 50).springify()}
                   >
-                    <Text style={[styles.badgeIcon, { opacity: badge.earned ? 1 : 0.3 }]}>
-                      {badge.icon}
-                    </Text>
-                    <Text style={[
-                      styles.badgeLabel, 
-                      { color: badge.earned ? colors.text : colors.textMuted }
-                    ]}>
-                      {badge.label}
-                    </Text>
-                    {!badge.earned && (
-                      <View style={[styles.lockedOverlay, { backgroundColor: colors.background + 'CC' }]}>
-                        <Text style={styles.lockedIcon}>🔒</Text>
+                    <View
+                      style={[
+                        styles.badge,
+                        { 
+                          backgroundColor: badge.earned 
+                            ? badgeColor + '20'
+                            : colors.backgroundTertiary,
+                          borderColor: badge.earned 
+                            ? badgeColor
+                            : colors.border,
+                        },
+                      ]}
+                      accessibilityLabel={`${badge.label} 배지${badge.earned ? ', 획득함' : ', 미획득'}`}
+                    >
+                      <View style={[
+                        styles.badgeIconContainer,
+                        { opacity: badge.earned ? 1 : 0.4 }
+                      ]}>
+                        <IconComponent 
+                          size={28} 
+                          color={badge.earned ? badgeColor : colors.textMuted} 
+                        />
                       </View>
-                    )}
-                  </View>
-                </Animated.View>
-              ))}
+                      <Text style={[
+                        styles.badgeLabel, 
+                        { color: badge.earned ? colors.text : colors.textMuted }
+                      ]}>
+                        {badge.label}
+                      </Text>
+                      
+                      {/* 잠금 오버레이 */}
+                      {!badge.earned && (
+                        <View style={[styles.lockedOverlay, { backgroundColor: colors.background + 'DD' }]}>
+                          <LockIcon size={20} color={colors.textMuted} />
+                        </View>
+                      )}
+                    </View>
+                  </Animated.View>
+                );
+              })}
             </View>
           </ScrollView>
         </Animated.View>
@@ -273,19 +310,16 @@ export default function PortfolioScreen() {
               </Text>
             </View>
             <Text style={[styles.verifiedSubtext, { color: colors.textMuted }]}>
-              {STATS.totalLessons}회의 수업 기록이 검증되었습니다
+              {MOCK_STATS.totalLessons}회의 수업 기록이 검증되었습니다
             </Text>
           </GradientBorderCard>
         </Animated.View>
-
-        {/* Bottom padding */}
-        <View style={{ height: 120 }} />
       </ScrollView>
     </View>
   );
 }
 
-// Stat Card Component
+// Stat Card 컴포넌트
 function StatCard({
   value,
   label,
@@ -307,7 +341,6 @@ function StatCard({
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      let start = 0;
       const duration = 1200;
       const startTime = Date.now();
 
@@ -349,15 +382,6 @@ function StatCard({
   );
 }
 
-function getBadgeColor(color: string, colors: any) {
-  switch (color) {
-    case 'orange': return colors.tint;
-    case 'mint': return colors.tintSecondary;
-    case 'purple': return colors.tintAccent;
-    default: return colors.tint;
-  }
-}
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -386,8 +410,7 @@ const styles = StyleSheet.create({
     height: 300,
   },
   content: {
-    padding: spacing.lg,
-    paddingTop: 60,
+    paddingHorizontal: spacing.lg,
   },
   profileSection: {
     marginBottom: spacing.xl,
@@ -492,8 +515,7 @@ const styles = StyleSheet.create({
     position: 'relative',
     overflow: 'hidden',
   },
-  badgeIcon: {
-    fontSize: 28,
+  badgeIconContainer: {
     marginBottom: spacing.sm,
   },
   badgeLabel: {
@@ -508,9 +530,6 @@ const styles = StyleSheet.create({
     bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  lockedIcon: {
-    fontSize: 20,
   },
   verifiedCard: {
     marginTop: spacing.sm,

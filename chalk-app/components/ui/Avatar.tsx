@@ -1,143 +1,168 @@
 import React from 'react';
-import { View, Text, StyleSheet, ViewStyle } from 'react-native';
+import { View, Text, StyleSheet, ViewStyle, TextStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import Colors, { componentSizes, radius } from '@/constants/Colors';
-import { useColorScheme } from '@/components/useColorScheme';
+
+import Colors, { radius, componentSizes } from '@/constants/Colors';
+import { useColorScheme } from '../useColorScheme';
+
+type AvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+type AvatarVariant = 'gradient' | 'ring' | 'solid';
+type AvatarColor = 'orange' | 'mint' | 'purple';
 
 interface AvatarProps {
   name: string;
-  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
-  variant?: 'gradient' | 'solid' | 'ring';
-  color?: 'orange' | 'mint' | 'purple' | 'default';
+  size?: AvatarSize;
+  variant?: AvatarVariant;
+  color?: AvatarColor;
   style?: ViewStyle;
+  textStyle?: TextStyle;
 }
 
 export function Avatar({
   name,
   size = 'md',
   variant = 'gradient',
-  color = 'default',
+  color = 'orange',
   style,
+  textStyle,
 }: AvatarProps) {
   const colorScheme = useColorScheme() ?? 'dark';
   const colors = Colors[colorScheme];
-  
-  const dimension = componentSizes.avatar[size];
-  const fontSize = dimension * 0.4;
-  const initial = name.charAt(0).toUpperCase();
+
+  const initials = getInitials(name);
+  const avatarSize = componentSizes.avatar[size];
+  const fontSize = getFontSize(size);
 
   const getGradientColors = (): [string, string] => {
     switch (color) {
-      case 'orange': return [colors.gradientStart, '#FF8F65'];
-      case 'mint': return ['#00D4B8', colors.gradientEnd];
-      case 'purple': return [colors.gradientAccent || '#A855F7', '#C084FC'];
-      default: return [colors.gradientStart, colors.gradientEnd];
+      case 'mint':
+        return [colors.tintSecondary, colors.tintSecondary + 'CC'];
+      case 'purple':
+        return [colors.tintAccent, colors.tintAccent + 'CC'];
+      case 'orange':
+      default:
+        return [colors.tint, colors.gradientEnd];
     }
   };
 
-  const getSolidColor = () => {
-    switch (color) {
-      case 'orange': return colors.tint;
-      case 'mint': return colors.tintSecondary;
-      case 'purple': return colors.tintAccent;
-      default: return colors.tint;
-    }
-  };
+  const containerStyle: ViewStyle[] = [
+    styles.container,
+    {
+      width: avatarSize,
+      height: avatarSize,
+      borderRadius: avatarSize / 2,
+    },
+    style,
+  ];
 
+  const textStyles: TextStyle[] = [
+    styles.text,
+    { fontSize },
+    textStyle,
+  ];
+
+  // Solid variant
+  if (variant === 'solid') {
+    const bgColor = color === 'orange' 
+      ? colors.brandMuted 
+      : color === 'mint' 
+      ? colors.brandSecondaryMuted 
+      : colors.brandAccentMuted;
+
+    const textColor = color === 'orange'
+      ? colors.tint
+      : color === 'mint'
+      ? colors.tintSecondary
+      : colors.tintAccent;
+
+    return (
+      <View style={[containerStyle, { backgroundColor: bgColor }]}>
+        <Text style={[textStyles, { color: textColor }]}>{initials}</Text>
+      </View>
+    );
+  }
+
+  // Ring variant - gradient border with transparent inside
   if (variant === 'ring') {
     return (
-      <View style={[styles.ringOuter, { width: dimension, height: dimension }, style]}>
-        <LinearGradient
-          colors={getGradientColors()}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[styles.ringGradient, { borderRadius: dimension / 2 }]}
-        >
-          <View
-            style={[
-              styles.ringInner,
-              {
-                width: dimension - 4,
-                height: dimension - 4,
-                borderRadius: (dimension - 4) / 2,
-                backgroundColor: colors.background,
-              },
-            ]}
-          >
-            <Text style={[styles.initial, { fontSize, color: colors.text }]}>
-              {initial}
-            </Text>
-          </View>
-        </LinearGradient>
-      </View>
-    );
-  }
-
-  if (variant === 'solid') {
-    return (
-      <View
-        style={[
-          styles.solid,
-          {
-            width: dimension,
-            height: dimension,
-            borderRadius: dimension / 2,
-            backgroundColor: getSolidColor(),
-          },
-          style,
-        ]}
+      <LinearGradient
+        colors={getGradientColors()}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={containerStyle}
       >
-        <Text style={[styles.initial, { fontSize }]}>{initial}</Text>
-      </View>
+        <View
+          style={[
+            styles.ringInner,
+            {
+              width: avatarSize - 4,
+              height: avatarSize - 4,
+              borderRadius: (avatarSize - 4) / 2,
+              backgroundColor: colors.background,
+            },
+          ]}
+        >
+          <Text style={[textStyles, { color: colors.text }]}>{initials}</Text>
+        </View>
+      </LinearGradient>
     );
   }
 
-  // Default: gradient
+  // Gradient variant (default)
   return (
     <LinearGradient
       colors={getGradientColors()}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
-      style={[
-        styles.gradient,
-        {
-          width: dimension,
-          height: dimension,
-          borderRadius: dimension / 2,
-        },
-        style,
-      ]}
+      style={containerStyle}
     >
-      <Text style={[styles.initial, { fontSize }]}>{initial}</Text>
+      <Text style={[textStyles, { color: '#FFFFFF' }]}>{initials}</Text>
     </LinearGradient>
   );
 }
 
+function getInitials(name: string): string {
+  const parts = name.trim().split(' ');
+  if (parts.length === 1) {
+    // 한글이면 첫 글자만
+    return parts[0].charAt(0);
+  }
+  return parts
+    .slice(0, 2)
+    .map(p => p.charAt(0))
+    .join('')
+    .toUpperCase();
+}
+
+function getFontSize(size: AvatarSize): number {
+  switch (size) {
+    case 'xs':
+      return 10;
+    case 'sm':
+      return 12;
+    case 'md':
+      return 14;
+    case 'lg':
+      return 16;
+    case 'xl':
+      return 22;
+    default:
+      return 14;
+  }
+}
+
 const styles = StyleSheet.create({
-  gradient: {
+  container: {
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
-  solid: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  ringOuter: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  ringGradient: {
-    padding: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
+  text: {
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   ringInner: {
     alignItems: 'center',
     justifyContent: 'center',
   },
-  initial: {
-    color: '#fff',
-    fontWeight: '700',
-  },
 });
-

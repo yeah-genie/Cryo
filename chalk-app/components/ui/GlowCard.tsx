@@ -1,122 +1,101 @@
 import React from 'react';
-import {
-  View,
-  StyleSheet,
-  ViewStyle,
-  Pressable,
-  PressableProps,
-} from 'react-native';
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-} from 'react-native-reanimated';
+import { View, StyleSheet, ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import Colors, { radius, spacing, shadows, animation } from '@/constants/Colors';
-import { useColorScheme } from '@/components/useColorScheme';
 
-interface GlowCardProps extends Omit<PressableProps, 'style'> {
+import Colors, { radius, spacing, shadows } from '@/constants/Colors';
+import { useColorScheme } from '../useColorScheme';
+
+type CardVariant = 'glass' | 'neon' | 'solid';
+type GlowColor = 'orange' | 'mint' | 'purple';
+
+interface GlowCardProps {
   children: React.ReactNode;
-  variant?: 'default' | 'elevated' | 'glass' | 'neon';
-  glowColor?: 'orange' | 'mint' | 'purple' | 'none';
+  variant?: CardVariant;
+  glowColor?: GlowColor;
   style?: ViewStyle;
   contentStyle?: ViewStyle;
-  noBorder?: boolean;
 }
-
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export function GlowCard({
   children,
-  variant = 'default',
-  glowColor = 'none',
+  variant = 'glass',
+  glowColor = 'orange',
   style,
   contentStyle,
-  noBorder = false,
-  onPress,
-  ...props
 }: GlowCardProps) {
   const colorScheme = useColorScheme() ?? 'dark';
   const colors = Colors[colorScheme];
-  
-  const scale = useSharedValue(1);
-  
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
 
-  const handlePressIn = () => {
-    if (onPress) {
-      scale.value = withSpring(0.98, animation.spring);
+  const getGlowBorderColor = () => {
+    switch (glowColor) {
+      case 'mint':
+        return colors.tintSecondary;
+      case 'purple':
+        return colors.tintAccent;
+      case 'orange':
+      default:
+        return colors.tint;
     }
-  };
-
-  const handlePressOut = () => {
-    scale.value = withSpring(1, animation.spring);
   };
 
   const getBackgroundColor = () => {
     switch (variant) {
-      case 'elevated':
+      case 'solid':
         return colors.backgroundElevated;
-      case 'glass':
-        return colors.glassBackground;
       case 'neon':
-        return colors.cardBackground;
+        return colorScheme === 'dark'
+          ? 'rgba(255, 255, 255, 0.04)'
+          : 'rgba(0, 0, 0, 0.02)';
+      case 'glass':
       default:
-        return colors.backgroundTertiary;
+        return colors.cardBackground;
     }
   };
 
   const getBorderColor = () => {
-    if (noBorder) return 'transparent';
-    if (variant === 'glass') return colors.glassBorder;
-    if (variant === 'neon' && glowColor !== 'none') {
-      switch (glowColor) {
-        case 'orange': return colors.neonOrange || colors.tint;
-        case 'mint': return colors.neonMint || colors.tintSecondary;
-        case 'purple': return colors.neonPurple || colors.tintAccent;
-      }
-    }
-    return colors.border;
-  };
-
-  const getGlowShadow = () => {
-    if (glowColor === 'none' || colorScheme === 'light') return {};
-    switch (glowColor) {
-      case 'orange': return shadows.glowOrange;
-      case 'mint': return shadows.glowMint;
-      case 'purple': return shadows.glowPurple;
-      default: return {};
+    switch (variant) {
+      case 'neon':
+        return getGlowBorderColor() + '30';
+      case 'solid':
+        return colors.border;
+      case 'glass':
+      default:
+        return colors.cardBorder;
     }
   };
 
   return (
-    <AnimatedPressable
+    <View
       style={[
         styles.container,
         {
           backgroundColor: getBackgroundColor(),
           borderColor: getBorderColor(),
-          borderWidth: noBorder ? 0 : 1,
         },
-        variant === 'neon' && glowColor !== 'none' && getGlowShadow(),
-        animatedStyle,
+        variant === 'neon' && shadows.sm,
         style,
       ]}
-      onPress={onPress}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
-      {...props}
     >
+      {/* Neon glow effect */}
+      {variant === 'neon' && (
+        <View style={[styles.glowWrapper, { borderRadius: radius.lg }]}>
+          <LinearGradient
+            colors={[getGlowBorderColor() + '20', 'transparent']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+        </View>
+      )}
+      
       <View style={[styles.content, contentStyle]}>
         {children}
       </View>
-    </AnimatedPressable>
+    </View>
   );
 }
 
-// Gradient border card variant
+// Gradient Border Card for special occasions
 export function GradientBorderCard({
   children,
   style,
@@ -132,21 +111,20 @@ export function GradientBorderCard({
   return (
     <View style={[styles.gradientBorderContainer, style]}>
       <LinearGradient
-        colors={[colors.gradientStart, colors.gradientEnd]}
+        colors={[colors.gradientStart + '40', colors.gradientEnd + '40']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.gradientBorder}
+      />
+      <View
+        style={[
+          styles.gradientBorderInner,
+          { backgroundColor: colors.backgroundElevated },
+          contentStyle,
+        ]}
       >
-        <View
-          style={[
-            styles.gradientBorderInner,
-            { backgroundColor: colors.backgroundElevated },
-            contentStyle,
-          ]}
-        >
-          {children}
-        </View>
-      </LinearGradient>
+        {children}
+      </View>
     </View>
   );
 }
@@ -154,6 +132,15 @@ export function GradientBorderCard({
 const styles = StyleSheet.create({
   container: {
     borderRadius: radius.lg,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  glowWrapper: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     overflow: 'hidden',
   },
   content: {
@@ -161,15 +148,18 @@ const styles = StyleSheet.create({
   },
   gradientBorderContainer: {
     borderRadius: radius.lg,
+    padding: 1.5,
     overflow: 'hidden',
   },
   gradientBorder: {
-    padding: 1.5,
-    borderRadius: radius.lg,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   gradientBorderInner: {
-    borderRadius: radius.lg - 1,
+    borderRadius: radius.lg - 1.5,
     padding: spacing.lg,
   },
 });
-

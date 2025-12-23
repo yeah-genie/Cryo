@@ -1,228 +1,295 @@
 import React from 'react';
 import {
-  StyleSheet,
+  TouchableOpacity,
   Text,
-  Pressable,
-  PressableProps,
-  ViewStyle,
-  TextStyle,
+  StyleSheet,
   ActivityIndicator,
   View,
+  ViewStyle,
+  TextStyle,
 } from 'react-native';
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-} from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
-import Colors, { radius, spacing, shadows, animation, componentSizes } from '@/constants/Colors';
-import { useColorScheme } from '@/components/useColorScheme';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withSequence,
+} from 'react-native-reanimated';
 
-interface NeonButtonProps extends Omit<PressableProps, 'style'> {
+import Colors, { spacing, typography, radius, shadows } from '@/constants/Colors';
+import { useColorScheme } from '../useColorScheme';
+
+type GlowColor = 'orange' | 'mint' | 'purple';
+type ButtonVariant = 'gradient' | 'outline' | 'secondary' | 'ghost';
+type ButtonSize = 'sm' | 'md' | 'lg';
+
+interface NeonButtonProps {
   title: string;
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'gradient';
-  size?: 'sm' | 'md' | 'lg';
-  glowColor?: 'orange' | 'mint' | 'purple';
+  onPress: () => void;
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+  glowColor?: GlowColor;
+  loading?: boolean;
+  disabled?: boolean;
+  fullWidth?: boolean;
   icon?: React.ReactNode;
   iconPosition?: 'left' | 'right';
-  loading?: boolean;
   style?: ViewStyle;
   textStyle?: TextStyle;
-  fullWidth?: boolean;
 }
 
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 export function NeonButton({
   title,
-  variant = 'primary',
+  onPress,
+  variant = 'gradient',
   size = 'md',
   glowColor = 'orange',
+  loading = false,
+  disabled = false,
+  fullWidth = false,
   icon,
   iconPosition = 'left',
-  loading = false,
   style,
   textStyle,
-  fullWidth = false,
-  disabled,
-  onPress,
-  ...props
 }: NeonButtonProps) {
   const colorScheme = useColorScheme() ?? 'dark';
   const colors = Colors[colorScheme];
-  
+
   const scale = useSharedValue(1);
+  const glowOpacity = useSharedValue(0);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
   }));
 
+  const glowAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: glowOpacity.value,
+  }));
+
   const handlePressIn = () => {
-    scale.value = withSpring(0.96, animation.spring);
+    scale.value = withTiming(0.97, { duration: 100 });
+    glowOpacity.value = withSequence(
+      withTiming(1, { duration: 150 }),
+      withTiming(0, { duration: 300 })
+    );
   };
 
   const handlePressOut = () => {
-    scale.value = withSpring(1, animation.spring);
+    scale.value = withTiming(1, { duration: 100 });
   };
 
-  const sizeStyles = componentSizes.button[size];
-
-  const getGlowColor = () => {
+  // Glow colors
+  const getGlowColors = () => {
     switch (glowColor) {
-      case 'orange': return colors.neonOrange || colors.tint;
-      case 'mint': return colors.neonMint || colors.tintSecondary;
-      case 'purple': return colors.neonPurple || colors.tintAccent;
+      case 'mint':
+        return [colors.tintSecondary, colors.tintSecondary + '00'];
+      case 'purple':
+        return [colors.tintAccent, colors.tintAccent + '00'];
+      case 'orange':
+      default:
+        return [colors.tint, colors.tint + '00'];
     }
   };
 
-  const getGlowShadow = () => {
-    if (colorScheme === 'light' || variant === 'ghost' || variant === 'outline') return {};
-    switch (glowColor) {
-      case 'orange': return shadows.glowOrange;
-      case 'mint': return shadows.glowMint;
-      case 'purple': return shadows.glowPurple;
+  // Button heights
+  const buttonHeight = {
+    sm: 36,
+    md: 44,
+    lg: 52,
+  }[size];
+
+  const fontSize = {
+    sm: 13,
+    md: 15,
+    lg: 16,
+  }[size];
+
+  const paddingHorizontal = {
+    sm: 14,
+    md: 18,
+    lg: 24,
+  }[size];
+
+  // Gradient colors
+  const gradientColors: [string, string] = [colors.gradientStart, colors.gradientEnd];
+
+  // Text color
+  const getTextColor = () => {
+    if (disabled) return colors.textMuted;
+    switch (variant) {
+      case 'gradient':
+        return '#FFFFFF';
+      case 'outline':
+        return glowColor === 'mint' ? colors.tintSecondary : colors.tint;
+      case 'secondary':
+        return textStyle?.color || colors.tintAccent;
+      case 'ghost':
+        return colors.textSecondary;
+      default:
+        return colors.text;
     }
   };
 
-  const getGradientColors = (): [string, string] => {
-    switch (glowColor) {
-      case 'orange': return [colors.gradientStart, '#FF8F65'];
-      case 'mint': return [colors.gradientEnd, '#5FFBEA'];
-      case 'purple': return [colors.gradientAccent || '#A855F7', '#C084FC'];
+  // Button styles
+  const getButtonStyles = (): ViewStyle[] => {
+    const base: ViewStyle = {
+      height: buttonHeight,
+      paddingHorizontal,
+      borderRadius: radius.lg,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.sm,
+    };
+
+    if (fullWidth) {
+      base.width = '100%';
+    }
+
+    switch (variant) {
+      case 'outline':
+        return [
+          base,
+          {
+            backgroundColor: 'transparent',
+            borderWidth: 1.5,
+            borderColor: glowColor === 'mint' ? colors.tintSecondary : colors.tint,
+          },
+        ];
+      case 'secondary':
+        return [
+          base,
+          {
+            backgroundColor: colors.brandAccentMuted,
+          },
+        ];
+      case 'ghost':
+        return [base, { backgroundColor: 'transparent' }];
+      default:
+        return [base];
     }
   };
 
-  const renderContent = () => (
-    <View style={styles.contentRow}>
+  const content = (
+    <>
       {loading ? (
-        <ActivityIndicator 
-          color={variant === 'outline' || variant === 'ghost' ? getGlowColor() : '#fff'} 
-          size="small" 
-        />
+        <ActivityIndicator color={getTextColor()} size="small" />
       ) : (
         <>
-          {icon && iconPosition === 'left' && <View style={styles.iconLeft}>{icon}</View>}
+          {icon && iconPosition === 'left' && icon}
           <Text
             style={[
               styles.text,
-              { fontSize: sizeStyles.fontSize },
-              variant === 'outline' && { color: getGlowColor() },
-              variant === 'ghost' && { color: getGlowColor() },
+              { fontSize, color: getTextColor() },
               textStyle,
             ]}
           >
             {title}
           </Text>
-          {icon && iconPosition === 'right' && <View style={styles.iconRight}>{icon}</View>}
+          {icon && iconPosition === 'right' && icon}
         </>
       )}
-    </View>
+    </>
   );
 
   if (variant === 'gradient') {
     return (
-      <AnimatedPressable
-        style={[
-          animatedStyle,
-          fullWidth && styles.fullWidth,
-          disabled && styles.disabled,
-          style,
-        ]}
-        onPress={onPress}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        disabled={disabled || loading}
-        {...props}
-      >
-        <LinearGradient
-          colors={getGradientColors()}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={[
-            styles.gradient,
-            {
-              height: sizeStyles.height,
-              paddingHorizontal: sizeStyles.paddingHorizontal,
-            },
-            getGlowShadow(),
-          ]}
+      <View style={[fullWidth && styles.fullWidth, style]}>
+        {/* Glow layer */}
+        <Animated.View style={[styles.glowLayer, glowAnimatedStyle]}>
+          <LinearGradient
+            colors={getGlowColors() as [string, string]}
+            style={styles.glowGradient}
+          />
+        </Animated.View>
+
+        <AnimatedTouchable
+          style={[animatedStyle, styles.gradientButtonContainer, fullWidth && styles.fullWidth]}
+          onPress={onPress}
+          onPressIn={handlePressIn}
+          onPressOut={handlePressOut}
+          activeOpacity={0.9}
+          disabled={disabled || loading}
+          accessibilityRole="button"
+          accessibilityState={{ disabled }}
         >
-          {renderContent()}
-        </LinearGradient>
-      </AnimatedPressable>
+          <LinearGradient
+            colors={disabled ? [colors.textMuted, colors.textMuted] : gradientColors}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[
+              styles.gradientButton,
+              { height: buttonHeight, paddingHorizontal, borderRadius: radius.lg },
+            ]}
+          >
+            {content}
+          </LinearGradient>
+        </AnimatedTouchable>
+      </View>
     );
   }
 
   return (
-    <AnimatedPressable
-      style={[
-        styles.button,
-        {
-          height: sizeStyles.height,
-          paddingHorizontal: sizeStyles.paddingHorizontal,
-        },
-        variant === 'primary' && {
-          backgroundColor: getGlowColor(),
-          ...getGlowShadow(),
-        },
-        variant === 'secondary' && {
-          backgroundColor: colors.backgroundTertiary,
-        },
-        variant === 'outline' && {
-          backgroundColor: 'transparent',
-          borderWidth: 1.5,
-          borderColor: getGlowColor(),
-        },
-        variant === 'ghost' && {
-          backgroundColor: 'transparent',
-        },
-        fullWidth && styles.fullWidth,
-        disabled && styles.disabled,
-        animatedStyle,
-        style,
-      ]}
-      onPress={onPress}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
-      disabled={disabled || loading}
-      {...props}
-    >
-      {renderContent()}
-    </AnimatedPressable>
+    <View style={[fullWidth && styles.fullWidth, style]}>
+      {/* Glow layer for outline buttons */}
+      {variant === 'outline' && (
+        <Animated.View style={[styles.glowLayer, glowAnimatedStyle]}>
+          <LinearGradient
+            colors={getGlowColors() as [string, string]}
+            style={styles.glowGradient}
+          />
+        </Animated.View>
+      )}
+
+      <AnimatedTouchable
+        style={[animatedStyle, ...getButtonStyles(), disabled && styles.disabled]}
+        onPress={onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        activeOpacity={0.7}
+        disabled={disabled || loading}
+        accessibilityRole="button"
+        accessibilityState={{ disabled }}
+      >
+        {content}
+      </AnimatedTouchable>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  button: {
-    borderRadius: radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
+  fullWidth: {
+    width: '100%',
   },
-  gradient: {
-    borderRadius: radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
+  gradientButtonContainer: {
+    borderRadius: radius.lg,
+    overflow: 'hidden',
   },
-  contentRow: {
+  gradientButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: spacing.sm,
   },
   text: {
-    color: '#fff',
     fontWeight: '600',
-  },
-  iconLeft: {
-    marginRight: spacing.sm,
-  },
-  iconRight: {
-    marginLeft: spacing.sm,
-  },
-  fullWidth: {
-    width: '100%',
+    letterSpacing: 0.3,
   },
   disabled: {
     opacity: 0.5,
   },
+  glowLayer: {
+    position: 'absolute',
+    top: -10,
+    left: -10,
+    right: -10,
+    bottom: -10,
+    zIndex: -1,
+  },
+  glowGradient: {
+    flex: 1,
+    borderRadius: radius.xxl,
+  },
 });
-
