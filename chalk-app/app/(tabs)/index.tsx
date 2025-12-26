@@ -103,6 +103,7 @@ export default function LogScreen() {
       studentName: selectedStudent.name,
       date: today,
       time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+      duration: duration,
       topic: topic || 'General Review',
       rating,
       struggles,

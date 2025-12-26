@@ -17,7 +17,7 @@ export interface ScheduledLesson {
     duration: number;
     subject?: string;
     recurring: boolean;
-    homeworkDue?: string; // New: Expected homework
+    homeworkDue?: string;
 }
 
 export interface LessonLog {
@@ -26,12 +26,13 @@ export interface LessonLog {
     studentName: string;
     date: string; // YYYY-MM-DD
     time: string;
+    duration: number; // Duration in minutes (Added)
     topic: string;
     rating: 'good' | 'okay' | 'struggled';
     struggles: string[];
     notes?: string;
-    homeworkAssigned?: string; // New: Homework assigned during this lesson
-    homeworkCompleted?: boolean; // New: Was previous homework done?
+    homeworkAssigned?: string;
+    homeworkCompleted?: boolean;
     aiInsights?: string;
 }
 
@@ -110,7 +111,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
             setStudents(studentsJson ? JSON.parse(studentsJson) : DEFAULT_STUDENTS);
             setScheduledLessons(scheduledJson ? JSON.parse(scheduledJson) : []);
-            setLessonLogs(logsJson ? JSON.parse(logsJson) : []);
+
+            // Migrate logs to have duration if missing
+            const loadedLogs = logsJson ? JSON.parse(logsJson) : [];
+            const migratedLogs = loadedLogs.map((log: any) => ({
+                ...log,
+                duration: typeof log.duration === 'number' ? log.duration : 60
+            }));
+            setLessonLogs(migratedLogs);
+
             setActiveSession(activeSessionJson ? JSON.parse(activeSessionJson) : null);
         } catch (error) {
             console.error('Error loading data:', error);
