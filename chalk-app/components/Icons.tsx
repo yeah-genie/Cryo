@@ -70,6 +70,17 @@ export function PencilIcon({ size = 24, color = '#9CA3AF' }: IconProps) {
   );
 }
 
+export function CalendarIcon({ size = 24, color = '#9CA3AF' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Rect x="3" y="4" width="18" height="18" rx="2" ry="2" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      <Path d="M16 2V6" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      <Path d="M8 2V6" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      <Path d="M3 10H21" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    </Svg>
+  );
+}
+
 export function UsersIcon({ size = 24, color = '#9CA3AF' }: IconProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
@@ -228,6 +239,31 @@ export function BellIcon({ size = 24, color = '#9CA3AF' }: IconProps) {
   );
 }
 
+export function VideoIcon({ size = 24, color = '#9CA3AF' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M15 10L19 6V18L15 14"
+        stroke={color}
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Rect
+        x="3"
+        y="8"
+        width="12"
+        height="8"
+        rx="2"
+        stroke={color}
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
 // ===================================
 // UI ICONS
 // ===================================
@@ -337,16 +373,6 @@ export function FireIcon({ size = 24, color = '#00D4AA' }: IconProps) {
         fill={color}
         fillOpacity={0.4}
       />
-    </Svg>
-  );
-}
-
-export function TargetIcon({ size = 24, color = '#00D4AA' }: IconProps) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <Circle cx="12" cy="12" r="10" stroke={color} strokeWidth="1.5" />
-      <Circle cx="12" cy="12" r="6" stroke={color} strokeWidth="1.5" />
-      <Circle cx="12" cy="12" r="2" fill={color} />
     </Svg>
   );
 }
@@ -501,6 +527,74 @@ export function RefreshIcon({ size = 24, color = '#9CA3AF' }: IconProps) {
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Path d="M1 4V10H7M23 20V14H17" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
       <Path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10M23 14L18.36 18.36A9 9 0 0 1 3.51 15" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+export function SmileFaceIcon({ size = 24, color = '#9CA3AF' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Circle cx="12" cy="12" r="10" stroke={color} strokeWidth="1.5" />
+      <Path d="M8 14s1.5 2 4 2 4-2 4-2" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M9 9h.01M15 9h.01" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+export function MehFaceIcon({ size = 24, color = '#9CA3AF' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Circle cx="12" cy="12" r="10" stroke={color} strokeWidth="1.5" />
+      <Path d="M8 15h8" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M9 9h.01M15 9h.01" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+export function SadFaceIcon({ size = 24, color = '#9CA3AF' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Circle cx="12" cy="12" r="10" stroke={color} strokeWidth="1.5" />
+      <Path d="M16 16s-1.5-2-4-2-4 2-4 2" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M9 9h.01M15 9h.01" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+export function LightbulbIcon({ size = 24, color = '#9CA3AF' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M9 18h6" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M10 22h4" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M12 2a7 7 0 0 1 7 7c0 2.38-1.19 4.47-3 5.74V17a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 0 1 7-7z" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+export function TargetIcon({ size = 24, color = '#00D4AA' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Circle cx="12" cy="12" r="10" stroke={color} strokeWidth="1.5" />
+      <Circle cx="12" cy="12" r="6" stroke={color} strokeWidth="1.5" />
+      <Circle cx="12" cy="12" r="2" fill={color} />
+    </Svg>
+  );
+}
+
+export function EyeIcon({ size = 24, color = '#9CA3AF' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <Circle cx="12" cy="12" r="3" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+export function BookOpenIcon({ size = 24, color = '#9CA3AF' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
     </Svg>
   );
 }
