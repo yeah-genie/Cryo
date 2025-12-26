@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -6,522 +6,488 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
+  Pressable,
   ActivityIndicator,
-  Animated,
+  Modal,
+  KeyboardAvoidingView,
+  Platform,
+  Alert,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import * as Linking from 'expo-linking';
 
-import Colors, { spacing, typography } from '@/constants/Colors';
-import { useColorScheme } from '@/components/useColorScheme';
+import { colors, typography, spacing, radius, components } from '@/constants/Colors';
 import {
-  LevelHighIcon,
-  LevelMidIcon,
-  LevelLowIcon,
   SparklesIcon,
   SendIcon,
-  ChevronRightIcon,
+  PlusIcon,
   CheckCircleIcon,
+  XIcon,
+  SmileFaceIcon,
+  MehFaceIcon,
+  SadFaceIcon,
+  LightbulbIcon,
+  TargetIcon,
+  EyeIcon,
+  BookOpenIcon,
+  RefreshIcon,
+  TrashIcon,
 } from '@/components/Icons';
+import { useData } from '@/lib/DataContext';
+import { useZoomAuth } from '@/lib/useZoomAuth';
+import { getPastMeetings, meetingsToChalkSessions } from '@/lib/zoomService';
 
-// Mock data
-const MOCK_STUDENTS = [
-  { id: '1', name: '김민수', subject: '수학', grade: '중2', initial: 'M' },
-  { id: '2', name: '이서연', subject: '영어', grade: '고1', initial: 'S' },
-  { id: '3', name: '박지훈', subject: '수학', grade: '중1', initial: 'J' },
+// Rating icons
+const RATINGS = [
+  { id: 'good' as const, label: 'Got it', Icon: SmileFaceIcon, color: colors.level.high },
+  { id: 'okay' as const, label: 'Needs review', Icon: MehFaceIcon, color: colors.level.mid },
+  { id: 'struggled' as const, label: 'Struggled', Icon: SadFaceIcon, color: colors.level.low },
 ];
 
-const MOCK_OUTCOMES = [
-  { id: '1', title: '이차방정식 풀이' },
-  { id: '2', title: '인수분해' },
-  { id: '3', title: '함수의 개념' },
+// Universal struggle types
+const STRUGGLES = [
+  { id: 'understanding', label: 'Understanding', Icon: LightbulbIcon },
+  { id: 'practice', label: 'Practice', Icon: TargetIcon },
+  { id: 'memory', label: 'Memory', Icon: BookOpenIcon },
+  { id: 'focus', label: 'Focus', Icon: EyeIcon },
 ];
 
-type Level = 'high' | 'mid' | 'low' | null;
+// Recent topics for autocomplete (will be dynamic later)
+const RECENT_TOPICS = ['Quadratic Equations', 'Chapter 5', 'Essay Writing', 'Verb Tenses'];
 
-interface OutcomeCheck {
-  outcomeId: string;
-  level: Level;
-}
+export default function LogScreen() {
+  const { students, addStudent, removeStudent, lessonLogs, addLessonLog, removeLessonLog, getLogsForDate } = useData();
+  const { tokens: zoomTokens, isAuthenticated: isZoomAuth, signIn: zoomSignIn } = useZoomAuth();
 
-export default function TodayScreen() {
-  const colorScheme = useColorScheme() ?? 'dark'; // 기본 다크모드
-  const colors = Colors[colorScheme];
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
+  const [topic, setTopic] = useState('');
+  const [showTopicSuggestions, setShowTopicSuggestions] = useState(false);
+  const [rating, setRating] = useState<'good' | 'okay' | 'struggled' | null>(null);
+  const [struggles, setStruggles] = useState<string[]>([]);
+  const [notes, setNotes] = useState('');
+  const [showAddStudent, setShowAddStudent] = useState(false);
+  const [newStudentName, setNewStudentName] = useState('');
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [aiInsights, setAiInsights] = useState<string | null>(null);
+  const [showToast, setShowToast] = useState(false);
 
-  const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
-  const [outcomeChecks, setOutcomeChecks] = useState<OutcomeCheck[]>([]);
-  const [feedback, setFeedback] = useState('');
-  const [isPolishing, setIsPolishing] = useState(false);
-  const [polishedFeedback, setPolishedFeedback] = useState('');
-  const [step, setStep] = useState(1);
+  const selectedStudent = students.find(s => s.id === selectedStudentId);
+  const today = new Date().toISOString().split('T')[0];
+  const todaysLogs = getLogsForDate(today);
 
-  useEffect(() => {
-    if (selectedStudent) {
-      setOutcomeChecks(MOCK_OUTCOMES.map(o => ({ outcomeId: o.id, level: null })));
-      setStep(2);
-    }
-  }, [selectedStudent]);
-
-  const handleLevelSelect = (outcomeId: string, level: Level) => {
-    setOutcomeChecks(prev =>
-      prev.map(check =>
-        check.outcomeId === outcomeId ? { ...check, level } : check
-      )
-    );
+  const toggleStruggle = (id: string) => {
+    setStruggles(prev => prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]);
   };
 
-  const handlePolishFeedback = async () => {
-    if (!feedback.trim()) return;
-    setIsPolishing(true);
+  const handleAddStudent = () => {
+    if (!newStudentName.trim()) return;
+    const newStudent = addStudent({ name: newStudentName.trim() });
+    setNewStudentName('');
+    setShowAddStudent(false);
+    setSelectedStudentId(newStudent.id);
+  };
 
+  const handleDeleteStudent = (student: { id: string; name: string }) => {
+    Alert.alert('Delete Student', `Remove ${student.name}? This will also delete their scheduled lessons.`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete', style: 'destructive', onPress: () => {
+          if (selectedStudentId === student.id) setSelectedStudentId(null);
+          removeStudent(student.id);
+        }
+      },
+    ]);
+  };
+
+  const handleExtractInsights = () => {
+    if (!notes.trim()) return;
+    setIsExtracting(true);
     setTimeout(() => {
-      const student = MOCK_STUDENTS.find(s => s.id === selectedStudent);
-      setPolishedFeedback(
-        `안녕하세요, ${student?.name} 학부모님.\n\n` +
-        `오늘 수업에서 ${feedback}\n\n` +
-        `궁금하신 점이 있으시면 편하게 말씀해 주세요. 감사합니다.`
-      );
-      setIsPolishing(false);
+      setAiInsights(`Key observation: Focus on ${topic || 'this topic'} next session. Consider shorter practice sets.`);
+      setIsExtracting(false);
     }, 1500);
   };
 
-  const handleSend = async () => {
-    const message = polishedFeedback || feedback;
-    const url = `kakaotalk://send?text=${encodeURIComponent(message)}`;
-    const supported = await Linking.canOpenURL(url);
-    if (supported) await Linking.openURL(url);
+  const handleSave = () => {
+    if (!selectedStudent || !rating) return;
+
+    addLessonLog({
+      studentId: selectedStudent.id,
+      studentName: selectedStudent.name,
+      date: today,
+      time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+      topic: topic || 'General',
+      rating,
+      struggles,
+      notes,
+      aiInsights: aiInsights || undefined,
+    });
+
+    // Show toast
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 2000);
 
     // Reset
-    setSelectedStudent(null);
-    setFeedback('');
-    setPolishedFeedback('');
-    setStep(1);
+    setSelectedStudentId(null);
+    setTopic('');
+    setRating(null);
+    setStruggles([]);
+    setNotes('');
+    setAiInsights(null);
   };
 
-  const selectedStudentData = MOCK_STUDENTS.find(s => s.id === selectedStudent);
+  // Zoom에서 미팅 자동 가져오기
+  const syncFromZoom = async () => {
+    if (!zoomTokens?.accessToken) {
+      Alert.alert(
+        'Connect Zoom',
+        'Connect your Zoom account to auto-import completed meetings.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Connect', onPress: zoomSignIn },
+        ]
+      );
+      return;
+    }
+
+    setIsSyncing(true);
+    try {
+      const meetings = await getPastMeetings(zoomTokens.accessToken, 7);
+      const sessions = await meetingsToChalkSessions(zoomTokens.accessToken, meetings);
+
+      let syncedCount = 0;
+      for (const session of sessions) {
+        // 이미 존재하는 기록인지 확인
+        const existing = lessonLogs.find(l =>
+          l.date === session.date && l.time === session.time
+        );
+        if (existing) continue;
+
+        // 학생 찾기 또는 기본 학생
+        let student = students.find(s =>
+          s.name.toLowerCase().includes(session.studentName.toLowerCase())
+        );
+        if (!student && students.length > 0) {
+          student = students[0];
+        }
+
+        addLessonLog({
+          studentId: student?.id || 'zoom-import',
+          studentName: session.studentName,
+          date: session.date,
+          time: session.time,
+          topic: session.topic,
+          rating: 'good',
+          struggles: [],
+          notes: `[Auto] Imported from Zoom • ${session.duration}min`,
+        });
+        syncedCount++;
+      }
+
+      if (syncedCount > 0) {
+        Alert.alert('Synced!', `${syncedCount} sessions imported from Zoom`);
+      } else {
+        Alert.alert('Up to date', 'No new meetings found');
+      }
+    } catch (error) {
+      console.error('Zoom sync error:', error);
+      Alert.alert('Sync Failed', 'Could not sync with Zoom');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleDeleteLog = (logId: string, studentName: string) => {
+    Alert.alert('Delete Log', `Remove this log for ${studentName}?`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => removeLessonLog(logId) },
+    ]);
+  };
+
+  const filteredTopics = RECENT_TOPICS.filter(t =>
+    t.toLowerCase().includes(topic.toLowerCase()) && topic.length > 0
+  );
+
+  const getRatingIcon = (r: string) => {
+    const rating = RATINGS.find(x => x.id === r);
+    if (!rating) return null;
+    return <rating.Icon size={14} color={rating.color} />;
+  };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header gradient glow */}
-      <View style={styles.glowContainer}>
-        <LinearGradient
-          colors={['rgba(16, 185, 129, 0.15)', 'transparent']}
-          style={styles.glow}
-        />
-      </View>
+    <View style={styles.container}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
         {/* Header */}
         <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.text }]}>오늘의 수업</Text>
-          <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-            {new Date().toLocaleDateString('ko-KR', {
-              month: 'long',
-              day: 'numeric',
-              weekday: 'long'
-            })}
+          <Text style={styles.pageTitle}>Log Lesson</Text>
+          <Text style={styles.date}>
+            {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
           </Text>
         </View>
 
-        {/* Step 1: Student Selection */}
+        {/* Today's Logs */}
+        {todaysLogs.length > 0 && (
+          <View style={styles.todayLogs}>
+            <Text style={styles.todayLabel}>Today ({todaysLogs.length})</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {todaysLogs.map(log => (
+                <View key={log.id} style={styles.logChip}>
+                  {getRatingIcon(log.rating)}
+                  <Text style={styles.logChipText}>{log.studentName}</Text>
+                  <Text style={styles.logChipTime}>{log.time}</Text>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
+        {/* Student Selection */}
         <View style={styles.section}>
-          <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
-            학생 선택
-          </Text>
-
-          {MOCK_STUDENTS.map(student => (
-            <TouchableOpacity
-              key={student.id}
-              style={[
-                styles.studentCard,
-                {
-                  backgroundColor: colors.backgroundTertiary,
-                  borderColor: selectedStudent === student.id
-                    ? colors.tint
-                    : colors.border,
-                  borderWidth: selectedStudent === student.id ? 1.5 : 1,
-                },
-              ]}
-              onPress={() => setSelectedStudent(student.id)}
-              activeOpacity={0.7}
-            >
-              <LinearGradient
-                colors={
-                  selectedStudent === student.id
-                    ? [colors.gradientStart, colors.gradientEnd]
-                    : [colors.backgroundSecondary, colors.backgroundSecondary]
-                }
-                style={styles.avatar}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-              >
-                <Text style={styles.avatarText}>{student.initial}</Text>
-              </LinearGradient>
-
-              <View style={styles.studentInfo}>
-                <Text style={[styles.studentName, { color: colors.text }]}>
-                  {student.name}
-                </Text>
-                <Text style={[styles.studentMeta, { color: colors.textMuted }]}>
-                  {student.grade} · {student.subject}
-                </Text>
-              </View>
-
-              <ChevronRightIcon size={20} color={colors.textMuted} />
-            </TouchableOpacity>
-          ))}
+          <Text style={styles.sectionTitle}>Student</Text>
+          <View style={styles.studentList}>
+            {students.map(student => {
+              const isSelected = selectedStudentId === student.id;
+              return (
+                <Pressable
+                  key={student.id}
+                  style={[styles.studentItem, isSelected && styles.studentItemSelected]}
+                  onPress={() => setSelectedStudentId(student.id)}
+                  onLongPress={() => handleDeleteStudent(student)}
+                >
+                  <View style={[styles.avatar, isSelected && styles.avatarSelected]}>
+                    <Text style={[styles.avatarText, isSelected && styles.avatarTextSelected]}>
+                      {student.name[0]}
+                    </Text>
+                  </View>
+                  <Text style={[styles.studentName, isSelected && styles.studentNameSelected]}>
+                    {student.name}
+                  </Text>
+                </Pressable>
+              );
+            })}
+            <Pressable style={styles.addStudentBtn} onPress={() => setShowAddStudent(true)}>
+              <PlusIcon size={14} color={colors.accent.default} />
+            </Pressable>
+          </View>
         </View>
 
-        {/* Step 2: Outcome Checks */}
-        {step >= 2 && selectedStudent && (
+        {/* Topic + Rating */}
+        {selectedStudent && (
           <View style={styles.section}>
-            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
-              학습 목표 달성도
-            </Text>
+            <Text style={styles.sectionTitle}>What did you cover?</Text>
 
-            <View style={[styles.outcomeCard, { backgroundColor: colors.backgroundTertiary }]}>
-              {MOCK_OUTCOMES.map((outcome, idx) => {
-                const check = outcomeChecks.find(c => c.outcomeId === outcome.id);
+            <View style={styles.topicInputWrapper}>
+              <TextInput
+                style={styles.topicInput}
+                placeholder="e.g., Chapter 3, Essay practice..."
+                placeholderTextColor={colors.text.muted}
+                value={topic}
+                onChangeText={(v) => {
+                  setTopic(v);
+                  setShowTopicSuggestions(v.length > 0);
+                }}
+                onFocus={() => setShowTopicSuggestions(topic.length > 0)}
+                onBlur={() => setTimeout(() => setShowTopicSuggestions(false), 200)}
+              />
+              {showTopicSuggestions && filteredTopics.length > 0 && (
+                <View style={styles.suggestions}>
+                  {filteredTopics.map((t, i) => (
+                    <Pressable key={i} style={styles.suggestionItem} onPress={() => { setTopic(t); setShowTopicSuggestions(false); }}>
+                      <Text style={styles.suggestionText}>{t}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+            </View>
+
+            <Text style={styles.subLabel}>How did it go?</Text>
+            <View style={styles.ratingRow}>
+              {RATINGS.map(r => {
+                const isSelected = rating === r.id;
                 return (
-                  <View
-                    key={outcome.id}
-                    style={[
-                      styles.outcomeRow,
-                      idx < MOCK_OUTCOMES.length - 1 && {
-                        borderBottomWidth: 1,
-                        borderBottomColor: colors.border
-                      }
-                    ]}
+                  <Pressable
+                    key={r.id}
+                    style={[styles.ratingBtn, isSelected && { backgroundColor: `${r.color}15` }]}
+                    onPress={() => setRating(r.id)}
                   >
-                    <Text style={[styles.outcomeTitle, { color: colors.text }]}>
-                      {outcome.title}
-                    </Text>
-                    <View style={styles.levelButtons}>
-                      <TouchableOpacity
-                        style={[
-                          styles.levelBtn,
-                          check?.level === 'high' && styles.levelBtnActive,
-                          check?.level === 'high' && { backgroundColor: 'rgba(52, 211, 153, 0.15)' }
-                        ]}
-                        onPress={() => handleLevelSelect(outcome.id, 'high')}
-                      >
-                        <LevelHighIcon
-                          size={20}
-                          color={check?.level === 'high' ? colors.levelHigh : colors.textMuted}
-                        />
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={[
-                          styles.levelBtn,
-                          check?.level === 'mid' && styles.levelBtnActive,
-                          check?.level === 'mid' && { backgroundColor: 'rgba(96, 165, 250, 0.15)' }
-                        ]}
-                        onPress={() => handleLevelSelect(outcome.id, 'mid')}
-                      >
-                        <LevelMidIcon
-                          size={20}
-                          color={check?.level === 'mid' ? colors.levelMid : colors.textMuted}
-                        />
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={[
-                          styles.levelBtn,
-                          check?.level === 'low' && styles.levelBtnActive,
-                          check?.level === 'low' && { backgroundColor: 'rgba(251, 191, 36, 0.15)' }
-                        ]}
-                        onPress={() => handleLevelSelect(outcome.id, 'low')}
-                      >
-                        <LevelLowIcon
-                          size={20}
-                          color={check?.level === 'low' ? colors.levelLow : colors.textMuted}
-                        />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
+                    <r.Icon size={28} color={isSelected ? r.color : colors.text.muted} />
+                    <Text style={[styles.ratingLabel, isSelected && { color: r.color }]}>{r.label}</Text>
+                  </Pressable>
                 );
               })}
             </View>
 
-            <TouchableOpacity
-              style={[styles.nextButton, { borderColor: colors.border }]}
-              onPress={() => setStep(3)}
-            >
-              <Text style={[styles.nextButtonText, { color: colors.text }]}>
-                피드백 작성하기
-              </Text>
-              <ChevronRightIcon size={18} color={colors.textMuted} />
-            </TouchableOpacity>
+            <Text style={styles.subLabel}>Where did they struggle? (optional)</Text>
+            <View style={styles.struggleRow}>
+              {STRUGGLES.map(type => {
+                const isSelected = struggles.includes(type.id);
+                return (
+                  <Pressable
+                    key={type.id}
+                    style={[styles.struggleChip, isSelected && styles.struggleChipSelected]}
+                    onPress={() => toggleStruggle(type.id)}
+                  >
+                    <type.Icon size={14} color={isSelected ? '#F59E0B' : colors.text.muted} />
+                    <Text style={[styles.struggleText, isSelected && styles.struggleTextSelected]}>{type.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
           </View>
         )}
 
-        {/* Step 3: Feedback */}
-        {step >= 3 && (
+        {/* Notes */}
+        {selectedStudent && rating && (
           <View style={styles.section}>
-            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
-              학부모 피드백
-            </Text>
-
+            <Text style={styles.sectionTitle}>Notes (optional)</Text>
             <TextInput
-              style={[
-                styles.feedbackInput,
-                {
-                  backgroundColor: colors.backgroundTertiary,
-                  color: colors.text,
-                  borderColor: colors.border,
-                },
-              ]}
-              placeholder="오늘 수업 내용을 간단히 적어주세요..."
-              placeholderTextColor={colors.textMuted}
+              style={styles.notesInput}
+              placeholder="Quick notes..."
+              placeholderTextColor={colors.text.muted}
+              value={notes}
+              onChangeText={setNotes}
               multiline
-              numberOfLines={4}
-              value={feedback}
-              onChangeText={setFeedback}
             />
 
-            <TouchableOpacity
-              style={[
-                styles.polishButton,
-                { backgroundColor: colors.backgroundTertiary, borderColor: colors.border },
-              ]}
-              onPress={handlePolishFeedback}
-              disabled={isPolishing || !feedback.trim()}
-            >
-              {isPolishing ? (
-                <ActivityIndicator color={colors.tint} size="small" />
-              ) : (
-                <>
-                  <SparklesIcon size={18} color={colors.tint} />
-                  <Text style={[styles.polishButtonText, { color: colors.text }]}>
-                    AI로 다듬기
-                  </Text>
-                </>
-              )}
-            </TouchableOpacity>
+            {notes.length > 0 && (
+              <TouchableOpacity style={styles.extractBtn} onPress={handleExtractInsights} disabled={isExtracting}>
+                {isExtracting ? (
+                  <ActivityIndicator size="small" color={colors.accent.default} />
+                ) : (
+                  <>
+                    <SparklesIcon size={14} color={colors.accent.default} />
+                    <Text style={styles.extractBtnText}>Extract Insights</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            )}
 
-            {polishedFeedback && (
-              <View
-                style={[
-                  styles.polishedCard,
-                  { backgroundColor: 'rgba(16, 185, 129, 0.08)', borderColor: 'rgba(16, 185, 129, 0.2)' }
-                ]}
-              >
-                <View style={styles.polishedHeader}>
-                  <CheckCircleIcon size={16} color={colors.tint} />
-                  <Text style={[styles.polishedLabel, { color: colors.tint }]}>
-                    AI 수정 완료
-                  </Text>
+            {aiInsights && (
+              <View style={styles.insightCard}>
+                <View style={styles.insightHeader}>
+                  <CheckCircleIcon size={12} color={colors.accent.default} />
+                  <Text style={styles.insightLabel}>AI Insight</Text>
                 </View>
-                <Text style={[styles.polishedText, { color: colors.textSecondary }]}>
-                  {polishedFeedback}
-                </Text>
+                <Text style={styles.insightText}>{aiInsights}</Text>
               </View>
             )}
 
-            <TouchableOpacity
-              style={styles.sendButton}
-              onPress={handleSend}
-            >
-              <LinearGradient
-                colors={[colors.gradientStart, colors.gradientEnd]}
-                style={styles.sendButtonGradient}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-              >
-                <SendIcon size={18} color="#fff" />
-                <Text style={styles.sendButtonText}>카카오톡 전송</Text>
-              </LinearGradient>
+            <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
+              <SendIcon size={14} color={colors.bg.base} />
+              <Text style={styles.saveBtnText}>Save Lesson</Text>
             </TouchableOpacity>
           </View>
         )}
+
       </ScrollView>
+
+      {/* Quick Add Student Modal */}
+      <Modal visible={showAddStudent} transparent animationType="fade">
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
+          <View style={styles.quickModal}>
+            <View style={styles.quickModalHeader}>
+              <Text style={styles.quickModalTitle}>Add Student</Text>
+              <TouchableOpacity onPress={() => setShowAddStudent(false)}>
+                <XIcon size={18} color={colors.text.muted} />
+              </TouchableOpacity>
+            </View>
+            <TextInput
+              style={styles.quickInput}
+              placeholder="Name"
+              placeholderTextColor={colors.text.muted}
+              value={newStudentName}
+              onChangeText={setNewStudentName}
+              autoFocus
+            />
+            <TouchableOpacity
+              style={[styles.quickSaveBtn, !newStudentName.trim() && styles.quickSaveBtnDisabled]}
+              onPress={handleAddStudent}
+              disabled={!newStudentName.trim()}
+            >
+              <Text style={styles.quickSaveBtnText}>Add</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Toast Notification */}
+      {showToast && (
+        <View style={styles.toast}>
+          <CheckCircleIcon size={16} color="#22C55E" />
+          <Text style={styles.toastText}>Lesson saved!</Text>
+        </View>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  glowContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 200,
-    overflow: 'hidden',
-  },
-  glow: {
-    position: 'absolute',
-    top: -100,
-    left: '50%',
-    marginLeft: -200,
-    width: 400,
-    height: 300,
-    borderRadius: 200,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  content: {
-    padding: spacing.lg,
-    paddingTop: spacing.xl,
-    paddingBottom: 100,
-  },
-  header: {
-    marginBottom: spacing.xl,
-  },
-  title: {
-    ...typography.h1,
-  },
-  subtitle: {
-    ...typography.bodySmall,
-    marginTop: spacing.xs,
-  },
-  section: {
-    marginBottom: spacing.xl,
-  },
-  sectionLabel: {
-    ...typography.caption,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: spacing.md,
-  },
-  studentCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.md,
-    borderRadius: 12,
-    marginBottom: spacing.sm,
-  },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  studentInfo: {
-    flex: 1,
-    marginLeft: spacing.md,
-  },
-  studentName: {
-    ...typography.body,
-    fontWeight: '600',
-  },
-  studentMeta: {
-    ...typography.caption,
-    marginTop: 2,
-  },
-  outcomeCard: {
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  outcomeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: spacing.md,
-  },
-  outcomeTitle: {
-    ...typography.body,
-    flex: 1,
-  },
-  levelButtons: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  levelBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  levelBtnActive: {
-    transform: [{ scale: 1.1 }],
-  },
-  nextButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing.md,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginTop: spacing.md,
-    gap: spacing.xs,
-  },
-  nextButtonText: {
-    ...typography.body,
-    fontWeight: '500',
-  },
-  feedbackInput: {
-    borderRadius: 12,
-    padding: spacing.md,
-    fontSize: 15,
-    minHeight: 100,
-    textAlignVertical: 'top',
-    borderWidth: 1,
-  },
-  polishButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing.md,
-    borderRadius: 12,
-    marginTop: spacing.md,
-    borderWidth: 1,
-    gap: spacing.sm,
-  },
-  polishButtonText: {
-    ...typography.body,
-    fontWeight: '500',
-  },
-  polishedCard: {
-    padding: spacing.md,
-    borderRadius: 12,
-    marginTop: spacing.md,
-    borderWidth: 1,
-  },
-  polishedHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    marginBottom: spacing.sm,
-  },
-  polishedLabel: {
-    ...typography.caption,
-    fontWeight: '600',
-  },
-  polishedText: {
-    ...typography.bodySmall,
-    lineHeight: 20,
-  },
-  sendButton: {
-    marginTop: spacing.lg,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  sendButtonGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing.md,
-    gap: spacing.sm,
-  },
-  sendButtonText: {
-    color: '#fff',
-    ...typography.body,
-    fontWeight: '600',
-  },
+  container: { flex: 1, backgroundColor: colors.bg.base },
+  content: { paddingHorizontal: spacing.xl, paddingTop: 52, paddingBottom: 100 },
+
+  header: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: spacing.lg },
+  pageTitle: { ...typography.h1, color: colors.text.primary },
+  date: { ...typography.caption, color: colors.text.muted },
+
+  todayLogs: { marginBottom: spacing['2xl'] },
+  todayLabel: { ...typography.caption, color: colors.text.muted, marginBottom: spacing.sm },
+  logChip: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, backgroundColor: colors.bg.secondary, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radius.full, marginRight: spacing.sm },
+  logChipText: { ...typography.small, color: colors.text.primary },
+  logChipTime: { ...typography.caption, color: colors.text.muted },
+
+  section: { marginBottom: spacing['2xl'] },
+  sectionTitle: { ...typography.caption, color: colors.text.muted, marginBottom: spacing.md, textTransform: 'uppercase' },
+  subLabel: { ...typography.caption, color: colors.text.muted, marginTop: spacing.lg, marginBottom: spacing.sm },
+
+  studentList: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  studentItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm, paddingHorizontal: spacing.md, borderRadius: radius.full, backgroundColor: colors.bg.secondary },
+  studentItemSelected: { backgroundColor: colors.accent.muted },
+  avatar: { width: 24, height: 24, borderRadius: 12, backgroundColor: colors.bg.tertiary, alignItems: 'center', justifyContent: 'center' },
+  avatarSelected: { backgroundColor: colors.accent.default },
+  avatarText: { ...typography.caption, fontWeight: '600', color: colors.text.muted },
+  avatarTextSelected: { color: colors.bg.base },
+  studentName: { ...typography.small, color: colors.text.primary },
+  studentNameSelected: { color: colors.accent.default },
+  addStudentBtn: { width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderColor: colors.border.default, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
+
+  topicInputWrapper: { position: 'relative', zIndex: 10 },
+  topicInput: { backgroundColor: colors.bg.secondary, borderRadius: radius.md, padding: spacing.lg, ...typography.body, color: colors.text.primary },
+  suggestions: { position: 'absolute', top: '100%', left: 0, right: 0, backgroundColor: colors.bg.tertiary, borderRadius: radius.md, marginTop: spacing.xs, overflow: 'hidden' },
+  suggestionItem: { padding: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border.light },
+  suggestionText: { ...typography.body, color: colors.text.primary },
+
+  ratingRow: { flexDirection: 'row', gap: spacing.md },
+  ratingBtn: { flex: 1, alignItems: 'center', paddingVertical: spacing.lg, backgroundColor: colors.bg.secondary, borderRadius: radius.md },
+  ratingLabel: { ...typography.caption, color: colors.text.muted, marginTop: spacing.xs },
+
+  struggleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  struggleChip: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingVertical: spacing.sm, paddingHorizontal: spacing.md, backgroundColor: colors.bg.secondary, borderRadius: radius.full },
+  struggleChipSelected: { backgroundColor: '#F59E0B20' },
+  struggleText: { ...typography.caption, color: colors.text.secondary },
+  struggleTextSelected: { color: '#F59E0B' },
+
+  notesInput: { backgroundColor: colors.bg.secondary, borderRadius: radius.md, padding: spacing.lg, ...typography.body, color: colors.text.primary, minHeight: 80, textAlignVertical: 'top' },
+  extractBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, marginTop: spacing.md, paddingVertical: spacing.md },
+  extractBtnText: { ...typography.small, color: colors.accent.default },
+
+  insightCard: { backgroundColor: colors.accent.subtle, borderRadius: radius.md, padding: spacing.lg, marginTop: spacing.md },
+  insightHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.sm },
+  insightLabel: { ...typography.caption, color: colors.accent.default },
+  insightText: { ...typography.small, color: colors.text.secondary, lineHeight: 18 },
+
+  saveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, height: components.button.lg, backgroundColor: colors.accent.default, borderRadius: radius.md, marginTop: spacing.xl },
+  saveBtnText: { ...typography.body, fontWeight: '600', color: colors.bg.base },
+
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: spacing.xl },
+  quickModal: { backgroundColor: colors.bg.secondary, borderRadius: radius.lg, padding: spacing.xl, width: '100%', maxWidth: 320 },
+  quickModalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.lg },
+  quickModalTitle: { ...typography.h2, color: colors.text.primary },
+  quickInput: { backgroundColor: colors.bg.tertiary, borderRadius: radius.md, padding: spacing.lg, ...typography.body, color: colors.text.primary, marginBottom: spacing.md },
+  quickSaveBtn: { height: components.button.md, backgroundColor: colors.accent.default, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
+  quickSaveBtnDisabled: { backgroundColor: colors.bg.tertiary },
+  quickSaveBtnText: { ...typography.body, fontWeight: '600', color: colors.bg.base },
+
+  // Toast
+  toast: { position: 'absolute', bottom: 100, left: spacing.xl, right: spacing.xl, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, backgroundColor: colors.bg.secondary, borderRadius: radius.md, padding: spacing.lg, borderWidth: 1, borderColor: '#22C55E40' },
+  toastText: { ...typography.body, color: colors.text.primary },
 });
