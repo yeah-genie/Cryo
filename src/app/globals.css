@@ -190,6 +190,11 @@ body {
   background-clip: text;
 }
 
+/* Radial gradient */
+.bg-gradient-radial {
+  background: radial-gradient(ellipse at center, var(--tw-gradient-from), var(--tw-gradient-to));
+}
+
 /* Glass effect */
 .glass {
   background: rgba(17, 17, 19, 0.8);
