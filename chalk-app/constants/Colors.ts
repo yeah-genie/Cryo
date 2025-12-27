@@ -62,13 +62,14 @@ export const radius = {
 };
 
 export const typography = {
-  h1: { fontSize: 28, fontWeight: '700' as '700', letterSpacing: -0.5 },
-  h2: { fontSize: 22, fontWeight: '600' as '600', letterSpacing: -0.5 },
-  h3: { fontSize: 18, fontWeight: '600' as '600' },
-  body: { fontSize: 16, fontWeight: '400' as '400', lineHeight: 24 },
-  small: { fontSize: 14, fontWeight: '500' as '500' },
-  caption: { fontSize: 12, fontWeight: '500' as '500' },
+  h1: { fontSize: 28, fontWeight: '700' as '700', letterSpacing: -0.5, color: colors.text.primary },
+  h2: { fontSize: 22, fontWeight: '600' as '600', letterSpacing: -0.5, color: colors.text.primary },
+  h3: { fontSize: 18, fontWeight: '600' as '600', color: colors.text.primary },
+  body: { fontSize: 16, fontWeight: '400' as '400', lineHeight: 24, color: colors.text.primary },
+  small: { fontSize: 14, fontWeight: '500' as '500', color: colors.text.primary },
+  caption: { fontSize: 12, fontWeight: '500' as '500', color: colors.text.secondary },
 };
+
 
 export const shadows = {
   sm: {

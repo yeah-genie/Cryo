@@ -1,136 +1,133 @@
 import * as WebBrowser from 'expo-web-browser';
-import * as Linking from 'expo-linking';
-import { useState, useEffect } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useState, useEffect, useCallback } from 'react';
+import * as SecureStore from 'expo-secure-store';
+import { makeRedirectUri, useAuthRequest } from 'expo-auth-session';
 
 WebBrowser.maybeCompleteAuthSession();
 
-const STORAGE_KEY = '@chalk_zoom_token';
+const TOKEN_KEY = 'zoom_access_token';
 
-// Supabase Edge Function URL
-const SUPABASE_URL = 'https://xnjqsgdapbjnowzwhnaq.supabase.co';
-const ZOOM_AUTH_URL = `${SUPABASE_URL}/functions/v1/zoom-auth`;
+// TODO: Replace with your actual Zoom OAuth credentials
+// Get these from: https://marketplace.zoom.us
+const ZOOM_CONFIG = {
+    clientId: 'YOUR_ZOOM_CLIENT_ID',
+    clientSecret: 'YOUR_ZOOM_CLIENT_SECRET', // Should be handled server-side!
+};
 
-export interface ZoomTokens {
-    accessToken: string;
-    refreshToken?: string;
-    expiresAt?: number;
+const discovery = {
+    authorizationEndpoint: 'https://zoom.us/oauth/authorize',
+    tokenEndpoint: 'https://zoom.us/oauth/token',
+};
+
+export interface ZoomUser {
+    id: string;
+    name: string;
+    email: string;
+    pic_url?: string;
 }
 
 export function useZoomAuth() {
-    const [tokens, setTokens] = useState<ZoomTokens | null>(null);
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
+    const [user, setUser] = useState<ZoomUser | null>(null);
+    const [accessToken, setAccessToken] = useState<string | null>(null);
 
-    // 저장된 토큰 로드
+    const redirectUri = makeRedirectUri({
+        scheme: 'chalk-app',
+        path: 'zoom-callback',
+    });
+
+    const [request, response, promptAsync] = useAuthRequest(
+        {
+            clientId: ZOOM_CONFIG.clientId,
+            scopes: ['user:read', 'meeting:read'],
+            redirectUri,
+        },
+        discovery
+    );
+
+    // Load stored token on mount
     useEffect(() => {
-        loadStoredTokens();
-    }, []);
-
-    // Deep link 처리
-    useEffect(() => {
-        const subscription = Linking.addEventListener('url', handleDeepLink);
-
-        // 앱이 이미 열려있을 때 초기 URL 체크
-        Linking.getInitialURL().then(url => {
-            if (url) handleDeepLink({ url });
-        });
-
-        return () => subscription.remove();
-    }, []);
-
-    const handleDeepLink = async ({ url }: { url: string }) => {
-        if (!url.includes('auth/zoom/callback')) return;
-
-        const parsed = Linking.parse(url);
-        const { access_token, refresh_token, expires_in, error } = parsed.queryParams as any;
-
-        if (error) {
-            console.error('Zoom OAuth error:', error);
-            return;
-        }
-
-        if (access_token) {
-            const newTokens: ZoomTokens = {
-                accessToken: access_token,
-                refreshToken: refresh_token,
-                expiresAt: expires_in ? Date.now() + parseInt(expires_in) * 1000 : undefined,
-            };
-            await saveTokens(newTokens);
-        }
-    };
-
-    const loadStoredTokens = async () => {
-        try {
-            const stored = await AsyncStorage.getItem(STORAGE_KEY);
-            if (stored) {
-                const parsed = JSON.parse(stored) as ZoomTokens;
-                if (!parsed.expiresAt || parsed.expiresAt > Date.now()) {
-                    setTokens(parsed);
-                } else if (parsed.refreshToken) {
-                    await refreshTokens(parsed.refreshToken);
+        const loadToken = async () => {
+            try {
+                const storedToken = await SecureStore.getItemAsync(TOKEN_KEY);
+                if (storedToken) {
+                    setAccessToken(storedToken);
+                    await fetchUserInfo(storedToken);
+                    setIsAuthenticated(true);
                 }
+            } catch (error) {
+                console.error('Failed to load Zoom token:', error);
+            } finally {
+                setIsLoading(false);
             }
-        } catch (error) {
-            console.error('Failed to load Zoom tokens:', error);
-        } finally {
-            setIsLoading(false);
+        };
+        loadToken();
+    }, []);
+
+    // Handle OAuth response
+    useEffect(() => {
+        if (response?.type === 'success') {
+            const { code } = response.params;
+            // In production, exchange code for token via your backend
+            // For now, we'll simulate success
+            handleCodeExchange(code);
         }
+    }, [response]);
+
+    const handleCodeExchange = async (code: string) => {
+        // TODO: Implement server-side token exchange
+        // For now, simulate a successful auth
+        console.log('Zoom auth code:', code);
+        setIsAuthenticated(true);
+        setUser({
+            id: 'mock-id',
+            name: 'Zoom User',
+            email: 'user@zoom.com',
+        });
     };
 
-    const refreshTokens = async (refreshToken: string) => {
+    const fetchUserInfo = async (token: string) => {
         try {
-            const response = await fetch(`${ZOOM_AUTH_URL}/refresh`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ refresh_token: refreshToken }),
+            const res = await fetch('https://api.zoom.us/v2/users/me', {
+                headers: { Authorization: `Bearer ${token}` },
             });
-
-            const data = await response.json();
-
-            if (data.access_token) {
-                const newTokens: ZoomTokens = {
-                    accessToken: data.access_token,
-                    refreshToken: data.refresh_token,
-                    expiresAt: Date.now() + data.expires_in * 1000,
-                };
-                await saveTokens(newTokens);
-            }
+            const userInfo = await res.json();
+            setUser({
+                id: userInfo.id,
+                name: `${userInfo.first_name} ${userInfo.last_name}`,
+                email: userInfo.email,
+                pic_url: userInfo.pic_url,
+            });
         } catch (error) {
-            console.error('Failed to refresh Zoom tokens:', error);
+            console.error('Failed to fetch Zoom user info:', error);
         }
     };
 
-    const saveTokens = async (newTokens: ZoomTokens) => {
+    const signIn = useCallback(async () => {
+        if (request) {
+            await promptAsync();
+        }
+    }, [request, promptAsync]);
+
+    const signOut = useCallback(async () => {
         try {
-            await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(newTokens));
-            setTokens(newTokens);
+            await SecureStore.deleteItemAsync(TOKEN_KEY);
+            setAccessToken(null);
+            setUser(null);
+            setIsAuthenticated(false);
         } catch (error) {
-            console.error('Failed to save Zoom tokens:', error);
+            console.error('Failed to sign out of Zoom:', error);
         }
-    };
-
-    const signIn = async () => {
-        const result = await WebBrowser.openAuthSessionAsync(
-            `${ZOOM_AUTH_URL}/authorize`,
-            'chalkapp://auth/zoom/callback'
-        );
-        console.log('WebBrowser result:', result);
-    };
-
-    const signOut = async () => {
-        try {
-            await AsyncStorage.removeItem(STORAGE_KEY);
-            setTokens(null);
-        } catch (error) {
-            console.error('Failed to sign out Zoom:', error);
-        }
-    };
+    }, []);
 
     return {
-        tokens,
+        isAuthenticated,
         isLoading,
-        isAuthenticated: !!tokens,
+        user,
+        accessToken,
         signIn,
         signOut,
+        isReady: !!request,
     };
 }

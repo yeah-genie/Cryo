@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, Switch, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Image, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, typography, spacing, radius } from '@/constants/Colors';
 import { layout } from '@/components/ui/Theme';
@@ -8,7 +8,12 @@ import { Button } from '@/components/ui/Button';
 import { useGoogleAuth } from '@/lib/useGoogleAuth';
 import { useZoomAuth } from '@/lib/useZoomAuth';
 import { useStripeAuth } from '@/lib/useStripeAuth';
-import { CalendarIcon, VideoIcon, LockIcon, CheckCircleIcon, ChevronRightIcon } from '@/components/Icons';
+import { CheckCircleIcon, ChevronRightIcon } from '@/components/Icons';
+
+// Logo images
+const GoogleCalendarLogo = require('@/assets/images/google-calendar.png');
+const ZoomLogo = require('@/assets/images/zoom.png');
+const StripeLogo = require('@/assets/images/stripe.png');
 
 export default function AccountScreen() {
   const googleAuth = useGoogleAuth();
@@ -47,9 +52,7 @@ export default function AccountScreen() {
         <Card style={styles.integrationCard}>
           <View style={styles.integrationRow}>
             <View style={layout.row}>
-              <View style={[styles.iconBox, { backgroundColor: '#4285F420' }]}>
-                <CalendarIcon size={20} color="#4285F4" />
-              </View>
+              <Image source={GoogleCalendarLogo} style={styles.logoImage} />
               <View style={styles.integrationInfo}>
                 <Text style={styles.integrationName}>Google Calendar</Text>
                 <Text style={styles.integrationStatus}>
@@ -57,11 +60,11 @@ export default function AccountScreen() {
                 </Text>
               </View>
             </View>
-            <Switch
-              value={googleAuth.isAuthenticated}
-              onValueChange={(v) => v ? googleAuth.signIn() : googleAuth.signOut()}
-              trackColor={{ false: colors.bg.tertiary, true: colors.accent.default }}
-              thumbColor={colors.text.primary}
+            <Button
+              title={googleAuth.isAuthenticated ? "Disconnect" : "Connect"}
+              size="sm"
+              variant={googleAuth.isAuthenticated ? "outline" : "secondary"}
+              onPress={() => googleAuth.isAuthenticated ? googleAuth.signOut() : googleAuth.signIn()}
             />
           </View>
         </Card>
@@ -70,9 +73,7 @@ export default function AccountScreen() {
         <Card style={styles.integrationCard}>
           <View style={styles.integrationRow}>
             <View style={layout.row}>
-              <View style={[styles.iconBox, { backgroundColor: '#2D8CFF20' }]}>
-                <VideoIcon size={20} color="#2D8CFF" />
-              </View>
+              <Image source={ZoomLogo} style={styles.logoImage} />
               <View style={styles.integrationInfo}>
                 <Text style={styles.integrationName}>Zoom</Text>
                 <Text style={styles.integrationStatus}>
@@ -81,10 +82,10 @@ export default function AccountScreen() {
               </View>
             </View>
             <Button
-                title={zoomAuth.isAuthenticated ? "Disconnect" : "Connect"}
-                size="sm"
-                variant={zoomAuth.isAuthenticated ? "outline" : "secondary"}
-                onPress={() => zoomAuth.isAuthenticated ? zoomAuth.signOut() : zoomAuth.signIn()}
+              title={zoomAuth.isAuthenticated ? "Disconnect" : "Connect"}
+              size="sm"
+              variant={zoomAuth.isAuthenticated ? "outline" : "secondary"}
+              onPress={() => zoomAuth.isAuthenticated ? zoomAuth.signOut() : zoomAuth.signIn()}
             />
           </View>
         </Card>
@@ -93,21 +94,20 @@ export default function AccountScreen() {
         <Card style={styles.integrationCard}>
           <View style={styles.integrationRow}>
             <View style={layout.row}>
-              <View style={[styles.iconBox, { backgroundColor: '#635BFF20' }]}>
-                <LockIcon size={20} color="#635BFF" />
-              </View>
+              <Image source={StripeLogo} style={styles.logoImage} />
               <View style={styles.integrationInfo}>
                 <Text style={styles.integrationName}>Stripe</Text>
+
                 <Text style={styles.integrationStatus}>
                   {stripeAuth.isAuthenticated ? 'Active' : 'Setup Required'}
                 </Text>
               </View>
             </View>
             <Button
-                title={stripeAuth.isAuthenticated ? "Manage" : "Connect"}
-                size="sm"
-                variant={stripeAuth.isAuthenticated ? "outline" : "secondary"}
-                onPress={() => stripeAuth.isAuthenticated ? Alert.alert('Stripe', 'Opening Dashboard...') : stripeAuth.signIn()}
+              title={stripeAuth.isAuthenticated ? "Manage" : "Connect"}
+              size="sm"
+              variant={stripeAuth.isAuthenticated ? "outline" : "secondary"}
+              onPress={() => stripeAuth.isAuthenticated ? Alert.alert('Stripe', 'Opening Dashboard...') : stripeAuth.signIn()}
             />
           </View>
         </Card>
@@ -115,13 +115,13 @@ export default function AccountScreen() {
         {/* Settings Section */}
         <Text style={styles.sectionTitle}>SETTINGS</Text>
         <Card style={styles.settingsCard}>
-            <View style={styles.settingItem}>
-                <Text style={styles.settingLabel}>Export Data</Text>
-                <ChevronRightIcon size={20} color={colors.text.secondary} />
-            </View>
-            <View style={[styles.settingItem, { borderBottomWidth: 0 }]}>
-                <Text style={[styles.settingLabel, { color: colors.status.error }]}>Log Out</Text>
-            </View>
+          <View style={styles.settingItem}>
+            <Text style={styles.settingLabel}>Export Data</Text>
+            <ChevronRightIcon size={20} color={colors.text.secondary} />
+          </View>
+          <View style={[styles.settingItem, { borderBottomWidth: 0 }]}>
+            <Text style={[styles.settingLabel, { color: colors.status.error }]}>Log Out</Text>
+          </View>
         </Card>
 
         <Text style={styles.versionText}>Version 1.0.2 (Build 14)</Text>
@@ -205,6 +205,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 12,
   },
+  logoImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    marginRight: 12,
+  },
+
   integrationInfo: {
     justifyContent: 'center',
   },

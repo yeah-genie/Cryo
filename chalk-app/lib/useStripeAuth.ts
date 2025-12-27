@@ -1,107 +1,122 @@
 import * as WebBrowser from 'expo-web-browser';
-import * as Linking from 'expo-linking';
-import { useState, useEffect } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useState, useEffect, useCallback } from 'react';
+import * as SecureStore from 'expo-secure-store';
+import { makeRedirectUri, useAuthRequest } from 'expo-auth-session';
 
 WebBrowser.maybeCompleteAuthSession();
 
-const STORAGE_KEY = '@chalk_stripe_token';
+const TOKEN_KEY = 'stripe_access_token';
+const ACCOUNT_KEY = 'stripe_account_id';
 
-// Supabase Edge Function URL
-const SUPABASE_URL = 'https://xnjqsgdapbjnowzwhnaq.supabase.co';
-const STRIPE_AUTH_URL = `${SUPABASE_URL}/functions/v1/stripe-auth`;
+// TODO: Replace with your actual Stripe Connect credentials
+// Get these from: https://dashboard.stripe.com/settings/connect
+const STRIPE_CONFIG = {
+    clientId: 'YOUR_STRIPE_CLIENT_ID', // ca_xxx
+};
 
-export interface StripeTokens {
-    accessToken: string;
-    stripeUserId: string;
-    refreshToken?: string;
+const discovery = {
+    authorizationEndpoint: 'https://connect.stripe.com/oauth/authorize',
+    tokenEndpoint: 'https://connect.stripe.com/oauth/token',
+};
+
+export interface StripeAccount {
+    id: string;
+    email?: string;
+    business_name?: string;
 }
 
 export function useStripeAuth() {
-    const [tokens, setTokens] = useState<StripeTokens | null>(null);
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
+    const [account, setAccount] = useState<StripeAccount | null>(null);
+    const [accessToken, setAccessToken] = useState<string | null>(null);
 
-    // 저장된 토큰 로드
+    const redirectUri = makeRedirectUri({
+        scheme: 'chalk-app',
+        path: 'stripe-callback',
+    });
+
+    const [request, response, promptAsync] = useAuthRequest(
+        {
+            clientId: STRIPE_CONFIG.clientId,
+            scopes: ['read_write'],
+            redirectUri,
+            extraParams: {
+                response_type: 'code',
+                scope: 'read_write',
+            },
+        },
+        discovery
+    );
+
+    // Load stored data on mount
     useEffect(() => {
-        loadStoredTokens();
-    }, []);
-
-    // Deep link 처리
-    useEffect(() => {
-        const subscription = Linking.addEventListener('url', handleDeepLink);
-
-        Linking.getInitialURL().then(url => {
-            if (url) handleDeepLink({ url });
-        });
-
-        return () => subscription.remove();
-    }, []);
-
-    const handleDeepLink = async ({ url }: { url: string }) => {
-        if (!url.includes('auth/stripe/callback')) return;
-
-        const parsed = Linking.parse(url);
-        const { access_token, stripe_user_id, refresh_token, error } = parsed.queryParams as any;
-
-        if (error) {
-            console.error('Stripe OAuth error:', error);
-            return;
-        }
-
-        if (access_token) {
-            const newTokens: StripeTokens = {
-                accessToken: access_token,
-                stripeUserId: stripe_user_id,
-                refreshToken: refresh_token,
-            };
-            await saveTokens(newTokens);
-        }
-    };
-
-    const loadStoredTokens = async () => {
-        try {
-            const stored = await AsyncStorage.getItem(STORAGE_KEY);
-            if (stored) {
-                setTokens(JSON.parse(stored));
+        const loadData = async () => {
+            try {
+                const storedToken = await SecureStore.getItemAsync(TOKEN_KEY);
+                const storedAccountId = await SecureStore.getItemAsync(ACCOUNT_KEY);
+                if (storedToken && storedAccountId) {
+                    setAccessToken(storedToken);
+                    setAccount({ id: storedAccountId });
+                    setIsAuthenticated(true);
+                }
+            } catch (error) {
+                console.error('Failed to load Stripe data:', error);
+            } finally {
+                setIsLoading(false);
             }
-        } catch (error) {
-            console.error('Failed to load Stripe tokens:', error);
-        } finally {
-            setIsLoading(false);
+        };
+        loadData();
+    }, []);
+
+    // Handle OAuth response
+    useEffect(() => {
+        if (response?.type === 'success') {
+            const { code } = response.params;
+            // In production, exchange code for token via your backend
+            handleCodeExchange(code);
         }
+    }, [response]);
+
+    const handleCodeExchange = async (code: string) => {
+        // TODO: Implement server-side token exchange with Stripe
+        // This MUST be done server-side as it requires your secret key
+        console.log('Stripe auth code:', code);
+
+        // Simulate success for now
+        setIsAuthenticated(true);
+        setAccount({
+            id: 'acct_mock',
+            email: 'tutor@example.com',
+            business_name: 'Alex Tutoring',
+        });
     };
 
-    const saveTokens = async (newTokens: StripeTokens) => {
+    const signIn = useCallback(async () => {
+        if (request) {
+            await promptAsync();
+        }
+    }, [request, promptAsync]);
+
+    const signOut = useCallback(async () => {
         try {
-            await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(newTokens));
-            setTokens(newTokens);
+            await SecureStore.deleteItemAsync(TOKEN_KEY);
+            await SecureStore.deleteItemAsync(ACCOUNT_KEY);
+            setAccessToken(null);
+            setAccount(null);
+            setIsAuthenticated(false);
         } catch (error) {
-            console.error('Failed to save Stripe tokens:', error);
+            console.error('Failed to disconnect Stripe:', error);
         }
-    };
-
-    const signIn = async () => {
-        const result = await WebBrowser.openAuthSessionAsync(
-            `${STRIPE_AUTH_URL}/authorize`,
-            'chalkapp://auth/stripe/callback'
-        );
-        console.log('Stripe WebBrowser result:', result);
-    };
-
-    const signOut = async () => {
-        try {
-            await AsyncStorage.removeItem(STORAGE_KEY);
-            setTokens(null);
-        } catch (error) {
-            console.error('Failed to sign out Stripe:', error);
-        }
-    };
+    }, []);
 
     return {
-        tokens,
+        isAuthenticated,
         isLoading,
-        isAuthenticated: !!tokens,
+        account,
+        accessToken,
         signIn,
         signOut,
+        isReady: !!request,
     };
 }
