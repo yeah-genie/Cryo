@@ -6,6 +6,12 @@ export interface Student {
     id: string;
     name: string;
     subject?: string;
+    // Payment fields
+    hourlyRate?: number;          // 시급 (원)
+    paymentCycle?: 'monthly' | 'per-lesson';  // 정산 주기
+    parentContact?: string;       // 학부모 연락처
+    taxRate?: number;             // 세금 (0.033 = 3.3%)
+    color?: string;               // 학생 색상
 }
 
 export interface ScheduledLesson {
@@ -26,14 +32,40 @@ export interface LessonLog {
     studentName: string;
     date: string; // YYYY-MM-DD
     time: string;
-    duration: number; // Duration in minutes (Added)
+    duration: number; // Duration in minutes
     topic: string;
+    topicId?: string; // Curriculum topic ID
     rating: 'good' | 'okay' | 'struggled';
     struggles: string[];
     notes?: string;
     homeworkAssigned?: string;
     homeworkCompleted?: boolean;
-    aiInsights?: string;
+    // New fields
+    photos?: string[]; // Photo URIs
+    zoomRecordingUrl?: string;
+    aiInsights?: {
+        summary: string;
+        nextSteps: string[];
+        focusAreas: string[];
+        encouragement: string;
+    };
+    // Payment fields
+    isPaid?: boolean;             // 정산 완료 여부
+    paidAmount?: number;          // 정산 금액
+}
+
+// Payment record for monthly settlement
+export interface Payment {
+    id: string;
+    studentId: string;
+    month: string;                // "2024-12"
+    lessonCount: number;
+    totalHours: number;
+    totalAmount: number;
+    taxAmount: number;
+    netAmount: number;            // 실수령액
+    isPaid: boolean;
+    paidDate?: string;
 }
 
 // Active Session Type

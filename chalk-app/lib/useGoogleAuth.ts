@@ -16,11 +16,21 @@ export interface GoogleUser {
     photo?: string;
 }
 
+export interface CalendarEvent {
+    id: string;
+    summary: string;
+    start: string;
+    end: string;
+    description?: string;
+}
+
 export function useGoogleAuth() {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [user, setUser] = useState<GoogleUser | null>(null);
     const [accessToken, setAccessToken] = useState<string | null>(null);
+    const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
+    const [isLoadingEvents, setIsLoadingEvents] = useState(false);
 
     // Load stored data on mount
     useEffect(() => {
@@ -126,7 +136,7 @@ export function useGoogleAuth() {
             }
         } catch (error) {
             console.error('[Google] Failed to start auth:', error);
-            Alert.alert('오류', 'Google 연결을 시작할 수 없습니다.');
+            Alert.alert('Error', 'Could not connect to Google.');
             throw error;
         }
     }, []);
@@ -144,13 +154,106 @@ export function useGoogleAuth() {
         }
     }, []);
 
+    // Fetch calendar events from Google Calendar API
+    const fetchEvents = useCallback(async () => {
+        if (!accessToken) {
+            console.log('[Google] No access token for fetching events');
+            return [];
+        }
+
+        setIsLoadingEvents(true);
+        try {
+            const now = new Date();
+            const timeMin = now.toISOString();
+            const timeMax = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+            const response = await fetch(
+                `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}&singleEvents=true&orderBy=startTime`,
+                {
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json',
+                    },
+                }
+            );
+
+            if (!response.ok) {
+                console.error('[Google] Failed to fetch events:', response.status);
+                return [];
+            }
+
+            const data = await response.json();
+            const events: CalendarEvent[] = (data.items || []).map((e: any) => ({
+                id: e.id,
+                summary: e.summary || 'No title',
+                start: e.start?.dateTime || e.start?.date,
+                end: e.end?.dateTime || e.end?.date,
+                description: e.description,
+            }));
+
+            setCalendarEvents(events);
+            console.log(`[Google] Fetched ${events.length} calendar events`);
+            return events;
+        } catch (error) {
+            console.error('[Google] Error fetching events:', error);
+            return [];
+        } finally {
+            setIsLoadingEvents(false);
+        }
+    }, [accessToken]);
+
+    // Create a new calendar event
+    const createEvent = useCallback(async (summary: string, startTime: Date, durationMinutes: number, description?: string) => {
+        if (!accessToken) {
+            Alert.alert('Error', 'Please connect Google Calendar first.');
+            return null;
+        }
+
+        try {
+            const endTime = new Date(startTime.getTime() + durationMinutes * 60 * 1000);
+
+            const response = await fetch(
+                'https://www.googleapis.com/calendar/v3/calendars/primary/events',
+                {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        summary,
+                        description,
+                        start: { dateTime: startTime.toISOString() },
+                        end: { dateTime: endTime.toISOString() },
+                    }),
+                }
+            );
+
+            if (!response.ok) {
+                console.error('[Google] Failed to create event:', response.status);
+                return null;
+            }
+
+            const event = await response.json();
+            console.log('[Google] Created calendar event:', event.id);
+            return event;
+        } catch (error) {
+            console.error('[Google] Error creating event:', error);
+            return null;
+        }
+    }, [accessToken]);
+
     return {
         isAuthenticated,
         isLoading,
         user,
         accessToken,
+        calendarEvents,
+        isLoadingEvents,
         signIn,
         signOut,
+        fetchEvents,
+        createEvent,
         isReady: true,
     };
 }

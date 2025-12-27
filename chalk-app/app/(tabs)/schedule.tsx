@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import {
+  StyleSheet, View, Text, ScrollView, TouchableOpacity, Alert, Modal, TextInput
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 
@@ -8,39 +10,147 @@ import { layout } from '@/components/ui/Theme';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { useData, ScheduledLesson } from '@/lib/DataContext';
-import { CalendarIcon, ClockIcon, VideoIcon, CheckCircleIcon, UsersIcon } from '@/components/Icons';
+import { useGoogleAuth } from '@/lib/useGoogleAuth';
+import { SettlementView } from '@/components/ui/SettlementView';
+import {
+  CalendarIcon, ClockIcon, VideoIcon, CheckCircleIcon, UsersIcon,
+  PlusIcon, XIcon, ChevronRightIcon, DollarIcon
+} from '@/components/Icons';
+
+const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const COLORS = [
+  colors.accent.default,
+  '#6366F1', // indigo
+  '#EC4899', // pink
+  '#F59E0B', // amber
+  '#10B981', // emerald
+  '#8B5CF6', // violet
+];
 
 export default function ScheduleScreen() {
   const router = useRouter();
-  const { students, scheduledLessons, lessonLogs, startSession, activeSession } = useData();
-  const [activeTab, setActiveTab] = useState<'upcoming' | 'history'>('upcoming');
+  const { students, scheduledLessons, addScheduledLesson, removeScheduledLesson, updateScheduledLesson, lessonLogs, startSession, activeSession } = useData();
+  const googleAuth = useGoogleAuth();
+
+  const [activeTab, setActiveTab] = useState<'upcoming' | 'week' | 'settle' | 'history'>('upcoming');
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [editingLesson, setEditingLesson] = useState<ScheduledLesson | null>(null);
+
+  // Form state
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
+  const [selectedDay, setSelectedDay] = useState(new Date().getDay());
+  const [selectedTime, setSelectedTime] = useState('16:00');
+  const [selectedDuration, setSelectedDuration] = useState(60);
+  const [isRecurring, setIsRecurring] = useState(true);
+  const [subject, setSubject] = useState('');
 
   // Filter today's lessons
   const today = new Date().getDay();
   const todaysLessons = scheduledLessons.filter(lesson => lesson.day === today);
 
+  // Week view data
+  const weekDays = Array.from({ length: 7 }, (_, i) => {
+    const date = new Date();
+    date.setDate(date.getDate() - date.getDay() + i);
+    return {
+      day: i,
+      date: date.getDate(),
+      lessons: scheduledLessons.filter(l => l.day === i),
+    };
+  });
 
   const handleStartClass = (lesson: ScheduledLesson) => {
     if (activeSession) {
-      Alert.alert('Session Active', 'You already have an active class. Please finish it first.');
+      Alert.alert('수업 진행 중', '이미 진행 중인 수업이 있습니다. 먼저 종료해주세요.');
       return;
     }
 
     Alert.alert(
-      'Start Class?',
-      `Launch Zoom for ${lesson.studentName}?`,
+      '수업 시작',
+      `${lesson.studentName}님과 수업을 시작할까요?`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: '취소', style: 'cancel' },
         {
-          text: 'Start',
+          text: '시작',
           onPress: () => {
             startSession(lesson.studentId, lesson.studentName);
-            // Linking.openURL(lesson.link).catch(err => console.error("Couldn't load page", err));
             router.push('/');
           }
         }
       ]
     );
+  };
+
+  const handleAddLesson = () => {
+    if (!selectedStudentId) {
+      Alert.alert('오류', '학생을 선택해주세요.');
+      return;
+    }
+
+    const student = students.find(s => s.id === selectedStudentId);
+    if (!student) return;
+
+    if (editingLesson) {
+      updateScheduledLesson(editingLesson.id, {
+        studentId: selectedStudentId,
+        studentName: student.name,
+        day: selectedDay,
+        time: selectedTime,
+        duration: selectedDuration,
+        recurring: isRecurring,
+        subject: subject || student.subject,
+      });
+    } else {
+      addScheduledLesson({
+        studentId: selectedStudentId,
+        studentName: student.name,
+        day: selectedDay,
+        time: selectedTime,
+        duration: selectedDuration,
+        recurring: isRecurring,
+        subject: subject || student.subject,
+      });
+    }
+
+    resetForm();
+    setShowAddModal(false);
+  };
+
+  const handleEditLesson = (lesson: ScheduledLesson) => {
+    setEditingLesson(lesson);
+    setSelectedStudentId(lesson.studentId);
+    setSelectedDay(lesson.day);
+    setSelectedTime(lesson.time);
+    setSelectedDuration(lesson.duration);
+    setIsRecurring(lesson.recurring);
+    setSubject(lesson.subject || '');
+    setShowAddModal(true);
+  };
+
+  const handleDeleteLesson = (lesson: ScheduledLesson) => {
+    Alert.alert(
+      '수업 삭제',
+      `${lesson.studentName}님의 ${DAYS[lesson.day]}요일 수업을 삭제할까요?`,
+      [
+        { text: '취소', style: 'cancel' },
+        { text: '삭제', style: 'destructive', onPress: () => removeScheduledLesson(lesson.id) }
+      ]
+    );
+  };
+
+  const resetForm = () => {
+    setEditingLesson(null);
+    setSelectedStudentId(null);
+    setSelectedDay(new Date().getDay());
+    setSelectedTime('16:00');
+    setSelectedDuration(60);
+    setIsRecurring(true);
+    setSubject('');
+  };
+
+  const getStudentColor = (studentId: string) => {
+    const index = students.findIndex(s => s.id === studentId);
+    return COLORS[index % COLORS.length];
   };
 
   return (
@@ -50,25 +160,37 @@ export default function ScheduleScreen() {
         {/* Header */}
         <View style={styles.header}>
           <Text style={typography.h1}>Schedule</Text>
-          <TouchableOpacity style={styles.calendarBtn} onPress={() => Alert.alert('Sync', 'Connect Google Calendar coming soon!')}>
-            <CalendarIcon size={20} color={colors.accent.default} />
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            {googleAuth.isAuthenticated && (
+              <View style={styles.syncBadge}>
+                <CheckCircleIcon size={12} color={colors.status.success} />
+                <Text style={styles.syncText}>Google Synced</Text>
+              </View>
+            )}
+            <TouchableOpacity style={styles.addBtn} onPress={() => setShowAddModal(true)}>
+              <PlusIcon size={20} color={colors.accent.default} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Tabs */}
         <View style={styles.tabContainer}>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'upcoming' && styles.tabActive]}
-            onPress={() => setActiveTab('upcoming')}
-          >
-            <Text style={[styles.tabText, activeTab === 'upcoming' && styles.tabTextActive]}>Upcoming</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'history' && styles.tabActive]}
-            onPress={() => setActiveTab('history')}
-          >
-            <Text style={[styles.tabText, activeTab === 'history' && styles.tabTextActive]}>History</Text>
-          </TouchableOpacity>
+          {[
+            { key: 'upcoming', label: 'Today' },
+            { key: 'week', label: 'Week' },
+            { key: 'settle', label: 'Settle' },
+            { key: 'history', label: 'History' },
+          ].map(tab => (
+            <TouchableOpacity
+              key={tab.key}
+              style={[styles.tab, activeTab === tab.key && styles.tabActive]}
+              onPress={() => setActiveTab(tab.key as any)}
+            >
+              <Text style={[styles.tabText, activeTab === tab.key && styles.tabTextActive]}>
+                {tab.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
@@ -76,50 +198,104 @@ export default function ScheduleScreen() {
           {/* UPCOMING VIEW */}
           {activeTab === 'upcoming' && (
             <View style={styles.list}>
-              {/* Integration Banner */}
-              <Card variant="glass" style={styles.banner}>
-                <View style={layout.row}>
-                  <CalendarIcon size={20} color={colors.text.secondary} />
-                  <Text style={styles.bannerText}>Sync with Google Calendar</Text>
-                </View>
-                <Button
-                  title="Connect"
-                  size="sm"
-                  variant="outline"
-                  onPress={() => Alert.alert('Coming Soon', 'Calendar integration is in Phase 2 roadmap.')}
-                />
-              </Card>
-
-              <Text style={styles.sectionTitle}>TODAY</Text>
-              {todaysLessons.map((lesson) => (
-                <Card key={lesson.id} style={styles.lessonCard}>
-                  <View style={styles.lessonRow}>
-                    <View style={styles.timeContainer}>
-                      <Text style={styles.timeText}>{lesson.time}</Text>
-                      <View style={styles.verticalLine} />
-                    </View>
-                    <View style={styles.lessonInfo}>
-                      <Text style={styles.studentName}>{lesson.studentName}</Text>
-                      <Text style={styles.subject}>{lesson.subject}</Text>
-                      {/* Homework Due Display */}
-                      {lesson.homeworkDue && (
-                        <View style={styles.homeworkBadge}>
-                          <CheckCircleIcon size={12} color={colors.status.warning} />
-                          <Text style={styles.homeworkText}>Due: {lesson.homeworkDue}</Text>
-                        </View>
-                      )}
-                    </View>
+              {/* Google Calendar Banner */}
+              {!googleAuth.isAuthenticated && (
+                <Card variant="glass" style={styles.banner}>
+                  <View style={layout.row}>
+                    <CalendarIcon size={20} color={colors.text.secondary} />
+                    <Text style={styles.bannerText}>Connect Google Calendar</Text>
                   </View>
                   <Button
-                    title="Start Class"
+                    title="Connect"
                     size="sm"
-                    icon={<VideoIcon size={16} color={colors.bg.base} />}
-                    onPress={() => handleStartClass(lesson)}
-                    style={{ marginTop: 12 }}
+                    variant="outline"
+                    onPress={googleAuth.signIn}
                   />
                 </Card>
+              )}
+
+              <Text style={styles.sectionTitle}>Today ({DAYS[today]})</Text>
+              {todaysLessons.length === 0 ? (
+                <Card style={styles.emptyCard}>
+                  <Text style={styles.emptyText}>No lessons scheduled for today</Text>
+                  <Button
+                    title="Add Lesson"
+                    size="sm"
+                    variant="secondary"
+                    onPress={() => setShowAddModal(true)}
+                    style={{ marginTop: spacing.md }}
+                  />
+                </Card>
+              ) : (
+                todaysLessons.map((lesson) => (
+                  <Card key={lesson.id} style={styles.lessonCard}>
+                    <TouchableOpacity
+                      style={styles.lessonRow}
+                      onPress={() => handleEditLesson(lesson)}
+                      onLongPress={() => handleDeleteLesson(lesson)}
+                    >
+                      <View style={styles.timeContainer}>
+                        <View style={[styles.colorDot, { backgroundColor: getStudentColor(lesson.studentId) }]} />
+                        <Text style={styles.timeText}>{lesson.time}</Text>
+                      </View>
+                      <View style={styles.lessonInfo}>
+                        <Text style={styles.studentName}>{lesson.studentName}</Text>
+                        <Text style={styles.subjectText}>{lesson.subject || 'General'}</Text>
+                        {lesson.homeworkDue && (
+                          <View style={styles.homeworkBadge}>
+                            <CheckCircleIcon size={12} color={colors.status.warning} />
+                            <Text style={styles.homeworkText}>HW: {lesson.homeworkDue}</Text>
+                          </View>
+                        )}
+                      </View>
+                      <ChevronRightIcon size={16} color={colors.text.muted} />
+                    </TouchableOpacity>
+                    <Button
+                      title="Start Lesson"
+                      size="sm"
+                      icon={<VideoIcon size={16} color={colors.bg.base} />}
+                      onPress={() => handleStartClass(lesson)}
+                      style={{ marginTop: 12 }}
+                    />
+                  </Card>
+                ))
+              )}
+            </View>
+          )}
+
+          {/* WEEK VIEW */}
+          {activeTab === 'week' && (
+            <View style={styles.weekContainer}>
+              {weekDays.map(({ day, date, lessons }) => (
+                <View key={day} style={[styles.dayColumn, day === today && styles.dayColumnToday]}>
+                  <View style={styles.dayHeader}>
+                    <Text style={[styles.dayLabel, day === today && styles.dayLabelToday]}>
+                      {DAYS[day]}
+                    </Text>
+                    <Text style={[styles.dateLabel, day === today && styles.dateLabelToday]}>
+                      {date}
+                    </Text>
+                  </View>
+                  <View style={styles.dayLessons}>
+                    {lessons.map(lesson => (
+                      <TouchableOpacity
+                        key={lesson.id}
+                        style={[styles.weekLesson, { backgroundColor: getStudentColor(lesson.studentId) + '20', borderLeftColor: getStudentColor(lesson.studentId) }]}
+                        onPress={() => handleEditLesson(lesson)}
+                      >
+                        <Text style={styles.weekLessonTime}>{lesson.time}</Text>
+                        <Text style={styles.weekLessonName} numberOfLines={1}>{lesson.studentName}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
               ))}
             </View>
+          )}
+
+          {/* SETTLE VIEW */}
+          {activeTab === 'settle' && (
+            <SettlementView />
           )}
 
           {/* HISTORY VIEW */}
@@ -131,29 +307,23 @@ export default function ScheduleScreen() {
                   <Text style={styles.emptyText}>No lessons logged yet.</Text>
                 </View>
               ) : (
-                [...lessonLogs].reverse().map((log) => (
+                [...lessonLogs].slice(0, 20).map((log) => (
                   <Card key={log.id} style={styles.historyCard}>
                     <View style={styles.historyHeader}>
                       <View style={layout.row}>
-                        <UsersIcon size={14} color={colors.accent.default} />
+                        <View style={[styles.colorDot, { backgroundColor: getStudentColor(log.studentId) }]} />
                         <Text style={styles.historyName}>{log.studentName}</Text>
                       </View>
                       <Text style={styles.historyDate}>{log.date}</Text>
                     </View>
                     <Text style={styles.historyTopic}>{log.topic}</Text>
-
-                    {/* Tags */}
                     <View style={styles.tagRow}>
                       <View style={[styles.ratingTag, { borderColor: getRatingColor(log.rating) }]}>
                         <Text style={[styles.tagText, { color: getRatingColor(log.rating) }]}>
-                          {log.rating?.toUpperCase()}
+                          {log.rating === 'good' ? 'Good' : log.rating === 'okay' ? 'Okay' : 'Struggled'}
                         </Text>
                       </View>
-                      {log.homeworkAssigned && (
-                        <View style={styles.homeworkTag}>
-                          <Text style={styles.homeworkTagText}>HW: {log.homeworkAssigned}</Text>
-                        </View>
-                      )}
+                      <Text style={styles.durationText}>{log.duration}min</Text>
                     </View>
                   </Card>
                 ))
@@ -163,6 +333,129 @@ export default function ScheduleScreen() {
 
         </ScrollView>
       </View>
+
+      {/* Add/Edit Modal */}
+      <Modal visible={showAddModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {editingLesson ? 'Edit Lesson' : 'Add Lesson'}
+              </Text>
+              <TouchableOpacity onPress={() => { setShowAddModal(false); resetForm(); }}>
+                <XIcon size={24} color={colors.text.muted} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalBody}>
+              {/* Student Selection */}
+              <Text style={styles.fieldLabel}>Student</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.studentScroll}>
+                {students.map(student => (
+                  <TouchableOpacity
+                    key={student.id}
+                    style={[styles.studentChip, selectedStudentId === student.id && { backgroundColor: getStudentColor(student.id) + '30', borderColor: getStudentColor(student.id) }]}
+                    onPress={() => setSelectedStudentId(student.id)}
+                  >
+                    <Text style={[styles.studentChipText, selectedStudentId === student.id && { color: getStudentColor(student.id) }]}>
+                      {student.name}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              {/* Day Selection */}
+              <Text style={styles.fieldLabel}>Day</Text>
+              <View style={styles.daysRow}>
+                {DAYS.map((day, i) => (
+                  <TouchableOpacity
+                    key={i}
+                    style={[styles.dayChip, selectedDay === i && styles.dayChipActive]}
+                    onPress={() => setSelectedDay(i)}
+                  >
+                    <Text style={[styles.dayChipText, selectedDay === i && styles.dayChipTextActive]}>
+                      {day}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Time */}
+              <Text style={styles.fieldLabel}>Time</Text>
+              <View style={styles.timeRow}>
+                {['14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00'].map(time => (
+                  <TouchableOpacity
+                    key={time}
+                    style={[styles.timeChip, selectedTime === time && styles.timeChipActive]}
+                    onPress={() => setSelectedTime(time)}
+                  >
+                    <Text style={[styles.timeChipText, selectedTime === time && styles.timeChipTextActive]}>
+                      {time}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Duration */}
+              <Text style={styles.fieldLabel}>Duration</Text>
+              <View style={styles.durationRow}>
+                {[30, 60, 90, 120].map(dur => (
+                  <TouchableOpacity
+                    key={dur}
+                    style={[styles.durationChip, selectedDuration === dur && styles.durationChipActive]}
+                    onPress={() => setSelectedDuration(dur)}
+                  >
+                    <Text style={[styles.durationChipText, selectedDuration === dur && styles.durationChipTextActive]}>
+                      {dur}min
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Subject */}
+              <Text style={styles.fieldLabel}>Subject</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Math, English, Science..."
+                placeholderTextColor={colors.text.muted}
+                value={subject}
+                onChangeText={setSubject}
+              />
+
+              {/* Recurring */}
+              <TouchableOpacity
+                style={styles.recurringRow}
+                onPress={() => setIsRecurring(!isRecurring)}
+              >
+                <View style={[styles.checkbox, isRecurring && styles.checkboxActive]}>
+                  {isRecurring && <CheckCircleIcon size={14} color={colors.accent.default} />}
+                </View>
+                <Text style={styles.recurringText}>Repeat weekly</Text>
+              </TouchableOpacity>
+            </ScrollView>
+
+            <View style={styles.modalFooter}>
+              {editingLesson && (
+                <Button
+                  title="Delete"
+                  variant="ghost"
+                  onPress={() => {
+                    handleDeleteLesson(editingLesson);
+                    setShowAddModal(false);
+                    resetForm();
+                  }}
+                  style={{ flex: 1 }}
+                />
+              )}
+              <Button
+                title={editingLesson ? 'Save' : 'Add'}
+                onPress={handleAddLesson}
+                style={{ flex: 1 }}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -181,12 +474,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.lg,
   },
-  calendarBtn: {
+  addBtn: {
     padding: 8,
     backgroundColor: colors.bg.secondary,
     borderRadius: radius.full,
     borderWidth: 1,
     borderColor: colors.border.default,
+  },
+  syncBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.status.success + '20',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: radius.full,
+  },
+  syncText: {
+    fontSize: 10,
+    color: colors.status.success,
+    fontWeight: '600',
   },
   tabContainer: {
     flexDirection: 'row',
@@ -232,38 +539,45 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     marginBottom: spacing.xs,
   },
+  emptyCard: {
+    alignItems: 'center',
+    padding: spacing.xl,
+  },
+  emptyText: {
+    ...typography.body,
+    color: colors.text.muted,
+  },
   lessonCard: {
     padding: 16,
   },
   lessonRow: {
     flexDirection: 'row',
+    alignItems: 'center',
   },
   timeContainer: {
     alignItems: 'center',
     marginRight: 16,
+  },
+  colorDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginBottom: 4,
   },
   timeText: {
     ...typography.small,
     fontWeight: '700',
     color: colors.text.primary,
   },
-  verticalLine: {
-    flex: 1,
-    width: 2,
-    backgroundColor: colors.bg.tertiary,
-    marginTop: 4,
-    borderRadius: 1,
-  },
   lessonInfo: {
     flex: 1,
-    paddingBottom: 8,
   },
   studentName: {
     ...typography.h3,
     color: colors.text.primary,
     marginBottom: 2,
   },
-  subject: {
+  subjectText: {
     ...typography.caption,
     color: colors.text.secondary,
   },
@@ -277,17 +591,69 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.status.warning,
   },
-
+  // Week view
+  weekContainer: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  dayColumn: {
+    flex: 1,
+    backgroundColor: colors.bg.secondary,
+    borderRadius: radius.md,
+    padding: 4,
+    minHeight: 200,
+  },
+  dayColumnToday: {
+    backgroundColor: colors.accent.default + '10',
+    borderWidth: 1,
+    borderColor: colors.accent.default + '30',
+  },
+  dayHeader: {
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.light,
+  },
+  dayLabel: {
+    fontSize: 10,
+    color: colors.text.muted,
+    fontWeight: '600',
+  },
+  dayLabelToday: {
+    color: colors.accent.default,
+  },
+  dateLabel: {
+    fontSize: 14,
+    color: colors.text.primary,
+    fontWeight: '700',
+  },
+  dateLabelToday: {
+    color: colors.accent.default,
+  },
+  dayLessons: {
+    paddingTop: 4,
+    gap: 4,
+  },
+  weekLesson: {
+    padding: 4,
+    borderRadius: 4,
+    borderLeftWidth: 2,
+  },
+  weekLessonTime: {
+    fontSize: 8,
+    color: colors.text.muted,
+  },
+  weekLessonName: {
+    fontSize: 9,
+    color: colors.text.primary,
+    fontWeight: '600',
+  },
   // History
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 60,
     gap: 16,
-  },
-  emptyText: {
-    ...typography.body,
-    color: colors.text.muted,
   },
   historyCard: {
     padding: 16,
@@ -315,7 +681,7 @@ const styles = StyleSheet.create({
   tagRow: {
     flexDirection: 'row',
     gap: 8,
-    flexWrap: 'wrap',
+    alignItems: 'center',
   },
   ratingTag: {
     paddingHorizontal: 8,
@@ -327,14 +693,175 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
   },
-  homeworkTag: {
-    backgroundColor: colors.bg.tertiary,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
+  durationText: {
+    ...typography.caption,
+    color: colors.text.muted,
   },
-  homeworkTagText: {
-    fontSize: 10,
+  // Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: colors.bg.base,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    maxHeight: '85%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.light,
+  },
+  modalTitle: {
+    ...typography.h2,
+    color: colors.text.primary,
+  },
+  modalBody: {
+    padding: spacing.lg,
+  },
+  modalFooter: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    padding: spacing.lg,
+    borderTopWidth: 1,
+    borderTopColor: colors.border.light,
+  },
+  fieldLabel: {
+    ...typography.caption,
+    color: colors.text.muted,
+    marginBottom: spacing.sm,
+    marginTop: spacing.md,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  studentScroll: {
+    flexDirection: 'row',
+  },
+  studentChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: radius.full,
+    backgroundColor: colors.bg.secondary,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+  },
+  studentChipText: {
+    ...typography.small,
+    color: colors.text.secondary,
+  },
+  daysRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  dayChip: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: radius.md,
+    backgroundColor: colors.bg.secondary,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+  },
+  dayChipActive: {
+    backgroundColor: colors.accent.default + '20',
+    borderColor: colors.accent.default,
+  },
+  dayChipText: {
+    ...typography.small,
+    color: colors.text.secondary,
+  },
+  dayChipTextActive: {
+    color: colors.accent.default,
+    fontWeight: '600',
+  },
+  timeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  timeChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: radius.md,
+    backgroundColor: colors.bg.secondary,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+  },
+  timeChipActive: {
+    backgroundColor: colors.accent.default + '20',
+    borderColor: colors.accent.default,
+  },
+  timeChipText: {
+    ...typography.small,
+    color: colors.text.secondary,
+  },
+  timeChipTextActive: {
+    color: colors.accent.default,
+    fontWeight: '600',
+  },
+  durationRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  durationChip: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: radius.md,
+    backgroundColor: colors.bg.secondary,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+  },
+  durationChipActive: {
+    backgroundColor: colors.accent.default + '20',
+    borderColor: colors.accent.default,
+  },
+  durationChipText: {
+    ...typography.small,
+    color: colors.text.secondary,
+  },
+  durationChipTextActive: {
+    color: colors.accent.default,
+    fontWeight: '600',
+  },
+  input: {
+    backgroundColor: colors.bg.secondary,
+    borderRadius: radius.md,
+    padding: spacing.lg,
+    color: colors.text.primary,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+    ...typography.body,
+  },
+  recurringRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: spacing.lg,
+    paddingVertical: spacing.md,
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+    backgroundColor: colors.bg.secondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxActive: {
+    backgroundColor: colors.accent.default + '20',
+    borderColor: colors.accent.default,
+  },
+  recurringText: {
+    ...typography.body,
     color: colors.text.secondary,
   },
 });

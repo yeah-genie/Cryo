@@ -10,9 +10,10 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
 
 import { colors, typography, spacing, radius } from '@/constants/Colors';
 import { layout } from '@/components/ui/Theme';
@@ -20,12 +21,14 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { StudentPicker } from '@/components/ui/StudentPicker';
 import { RatingSelector } from '@/components/ui/RatingSelector';
-import { TopicPicker } from '@/components/ui/TopicPicker';
 import { VoiceRecorder } from '@/components/ui/VoiceRecorder';
 import { useData } from '@/lib/DataContext';
-import { SparklesIcon, CheckCircleIcon, LightbulbIcon, TargetIcon, BookOpenIcon, EyeIcon } from '@/components/Icons';
-
-const RECENT_TOPICS = ['Quadratic Equations', 'Chapter 5', 'Essay Writing', 'Verb Tenses'];
+import {
+  SparklesIcon, CheckCircleIcon, LightbulbIcon, TargetIcon,
+  BookOpenIcon, EyeIcon, PlusIcon, XIcon, ChevronDownIcon
+} from '@/components/Icons';
+import { getTopicsForSubject, CurriculumTopic } from '@/data/curriculum';
+import { generateLessonInsights, generateTopicRecommendations, TopicRecommendation } from '@/services/geminiService';
 
 const STRUGGLES = [
   { id: 'understanding', label: 'Understanding', Icon: LightbulbIcon },
@@ -35,30 +38,75 @@ const STRUGGLES = [
 ];
 
 export default function LogScreen() {
-  const { students, addStudent, removeStudent, addLessonLog, getLogsForDate, activeSession, endSession } = useData();
-  const params = useLocalSearchParams();
+  const { students, addStudent, removeStudent, addLessonLog, getLogsForDate, getLogsForStudent, activeSession, endSession } = useData();
 
   // State
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
-  const [topic, setTopic] = useState('');
+  const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
+  const [customTopic, setCustomTopic] = useState('');
+  const [showTopicPicker, setShowTopicPicker] = useState(false);
   const [rating, setRating] = useState<'good' | 'okay' | 'struggled' | null>(null);
   const [struggles, setStruggles] = useState<string[]>([]);
   const [notes, setNotes] = useState('');
   const [homework, setHomework] = useState('');
-  const [isExtracting, setIsExtracting] = useState(false);
-  const [aiInsights, setAiInsights] = useState<string | null>(null);
+  const [photos, setPhotos] = useState<string[]>([]);
+  const [zoomRecordingUrl, setZoomRecordingUrl] = useState('');
+
+  // AI States
+  const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
+  const [aiInsights, setAiInsights] = useState<any>(null);
+  const [topicRecommendations, setTopicRecommendations] = useState<TopicRecommendation[]>([]);
+  const [showRecommendations, setShowRecommendations] = useState(false);
+
+  // UI States
   const [showToast, setShowToast] = useState(false);
 
-  // Active Session or Params Effect
-  useEffect(() => {
-    if (activeSession) {
-        setSelectedStudentId(activeSession.studentId);
-    }
-  }, [activeSession]);
-
+  // Derived
   const selectedStudent = students.find(s => s.id === selectedStudentId);
   const today = new Date().toISOString().split('T')[0];
   const todaysLogs = getLogsForDate(today);
+  const topics = selectedStudent?.subject ? getTopicsForSubject(selectedStudent.subject) : [];
+  const selectedTopic = topics.find(t => t.id === selectedTopicId);
+
+  // Active Session Effect
+  useEffect(() => {
+    if (activeSession) {
+      setSelectedStudentId(activeSession.studentId);
+    }
+  }, [activeSession]);
+
+  // Load topic recommendations when student changes
+  useEffect(() => {
+    if (selectedStudent) {
+      loadTopicRecommendations();
+    }
+  }, [selectedStudentId]);
+
+  const loadTopicRecommendations = async () => {
+    if (!selectedStudent) return;
+
+    const studentLogs = getLogsForStudent(selectedStudent.id);
+    const previousTopics = studentLogs.map(l => l.topic).slice(0, 5);
+    const lastRating = studentLogs[0]?.rating || 'okay';
+
+    // Auto-fill last topic for this student
+    if (studentLogs.length > 0 && !customTopic && !selectedTopicId) {
+      const lastTopic = studentLogs[0].topic;
+      setCustomTopic(lastTopic);
+    }
+
+    try {
+      const recommendations = await generateTopicRecommendations(
+        selectedStudent.name,
+        selectedStudent.subject || 'General',
+        previousTopics,
+        lastRating
+      );
+      setTopicRecommendations(recommendations);
+    } catch (error) {
+      console.error('Failed to load recommendations:', error);
+    }
+  };
 
   // Handlers
   const handleAddStudent = () => {
@@ -74,41 +122,98 @@ export default function LogScreen() {
     setStruggles(prev => prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]);
   };
 
-  const handleExtractInsights = () => {
-    if (!notes.trim()) return;
-    setIsExtracting(true);
-    setTimeout(() => {
-      setAiInsights(`Based on your notes, ${selectedStudent?.name} seems to struggle with application. Focus on practice problems next time.`);
-      setIsExtracting(false);
-    }, 1500);
+  const handlePickPhoto = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Required', 'Gallery access is needed to add photos.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: true,
+      quality: 0.7,
+      selectionLimit: 5 - photos.length,
+    });
+
+    if (!result.canceled && result.assets) {
+      setPhotos(prev => [...prev, ...result.assets.map(a => a.uri)].slice(0, 5));
+    }
+  };
+
+  const handleTakePhoto = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Required', 'Camera access is needed.');
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      quality: 0.7,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      setPhotos(prev => [...prev, result.assets[0].uri].slice(0, 5));
+    }
+  };
+
+  const removePhoto = (index: number) => {
+    setPhotos(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleGenerateInsights = async () => {
+    if (!selectedStudent || !rating) return;
+
+    setIsGeneratingInsights(true);
+    try {
+      const topic = selectedTopic?.nameKr || customTopic || 'General Review';
+      const insights = await generateLessonInsights({
+        studentName: selectedStudent.name,
+        topic,
+        rating,
+        struggles,
+        notes,
+      });
+      setAiInsights(insights);
+    } catch (error) {
+      console.error('Failed to generate insights:', error);
+      Alert.alert('Error', 'Failed to generate AI insights.');
+    } finally {
+      setIsGeneratingInsights(false);
+    }
   };
 
   const handleVoiceTranscription = (text: string) => {
-      setNotes(prev => prev ? `${prev}\n\n[Voice Memo]: ${text}` : text);
+    setNotes(prev => prev ? `${prev}\n\n${text}` : text);
   };
 
   const handleSave = () => {
     if (!selectedStudent || !rating) return;
 
     // Calculate duration if active session
-    let duration = 60; // Default
+    let duration = 60;
     if (activeSession) {
-        const diff = Math.floor((Date.now() - activeSession.startTime) / 1000 / 60);
-        duration = diff > 0 ? diff : 1;
-        endSession();
+      const diff = Math.floor((Date.now() - activeSession.startTime) / 1000 / 60);
+      duration = diff > 0 ? diff : 1;
+      endSession();
     }
+
+    const topic = selectedTopic?.nameKr || customTopic || 'General Review';
 
     addLessonLog({
       studentId: selectedStudent.id,
       studentName: selectedStudent.name,
       date: today,
       time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-      duration: duration,
-      topic: topic || 'General Review',
+      duration,
+      topic,
+      topicId: selectedTopicId || undefined,
       rating,
       struggles,
-      notes: activeSession ? `[Auto-Logged: ${duration} mins] ${notes}` : notes,
+      notes: activeSession ? `[Auto: ${duration}min] ${notes}` : notes,
       homeworkAssigned: homework,
+      photos: photos.length > 0 ? photos : undefined,
+      zoomRecordingUrl: zoomRecordingUrl || undefined,
       aiInsights: aiInsights || undefined,
     });
 
@@ -117,12 +222,16 @@ export default function LogScreen() {
     setTimeout(() => setShowToast(false), 2000);
 
     setSelectedStudentId(null);
-    setTopic('');
+    setSelectedTopicId(null);
+    setCustomTopic('');
     setRating(null);
     setStruggles([]);
     setNotes('');
     setHomework('');
+    setPhotos([]);
+    setZoomRecordingUrl('');
     setAiInsights(null);
+    setTopicRecommendations([]);
   };
 
   return (
@@ -141,7 +250,7 @@ export default function LogScreen() {
             </View>
             <View style={styles.dateBadge}>
               <Text style={styles.dateText}>
-                {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                {new Date().toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}
               </Text>
             </View>
           </View>
@@ -149,13 +258,13 @@ export default function LogScreen() {
           {/* Active Session Banner */}
           {activeSession && (
             <Card variant="glow" style={{ marginBottom: 24, borderColor: colors.accent.default }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                    <View style={styles.recordingDot} />
-                    <View>
-                        <Text style={[typography.small, { color: colors.accent.default }]}>CLASS IN PROGRESS</Text>
-                        <Text style={[typography.h3, { color: colors.text.primary }]}>{activeSession.studentName}</Text>
-                    </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <View style={styles.recordingDot} />
+                <View>
+                  <Text style={[typography.small, { color: colors.accent.default }]}>Lesson in Progress</Text>
+                  <Text style={[typography.h3, { color: colors.text.primary }]}>{activeSession.studentName}</Text>
                 </View>
+              </View>
             </Card>
           )}
 
@@ -163,7 +272,7 @@ export default function LogScreen() {
           {!activeSession && todaysLogs.length > 0 && (
             <View style={styles.statsRow}>
               <Text style={styles.statsText}>
-                <Text style={{ color: colors.accent.default, fontWeight: '700' }}>{todaysLogs.length}</Text> lessons logged today
+                Today <Text style={{ color: colors.accent.default, fontWeight: '700' }}>{todaysLogs.length}</Text> lessons logged
               </Text>
             </View>
           )}
@@ -179,22 +288,118 @@ export default function LogScreen() {
 
           {selectedStudent && (
             <>
-              {/* Topic */}
-              <TopicPicker
-                value={topic}
-                onChange={setTopic}
-                recentTopics={RECENT_TOPICS}
-              />
+              {/* AI Topic Recommendations */}
+              {topicRecommendations.length > 0 && !selectedTopicId && !customTopic && (
+                <View style={styles.section}>
+                  <TouchableOpacity
+                    style={styles.recommendationHeader}
+                    onPress={() => setShowRecommendations(!showRecommendations)}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <SparklesIcon size={16} color={colors.accent.default} />
+                      <Text style={styles.recommendationTitle}>AI Recommended Topics</Text>
+                    </View>
+                    <ChevronDownIcon size={16} color={colors.text.muted} />
+                  </TouchableOpacity>
+
+                  {showRecommendations && (
+                    <View style={styles.recommendationList}>
+                      {topicRecommendations.map((rec, i) => (
+                        <TouchableOpacity
+                          key={i}
+                          style={styles.recommendationItem}
+                          onPress={() => {
+                            setCustomTopic(rec.topic);
+                            setShowRecommendations(false);
+                          }}
+                        >
+                          <View>
+                            <Text style={styles.recTopic}>{rec.topic}</Text>
+                            <Text style={styles.recReason}>{rec.reason}</Text>
+                          </View>
+                          <View style={[styles.difficultyBadge, {
+                            backgroundColor: rec.difficulty === 'easy' ? colors.status.success + '20' :
+                              rec.difficulty === 'hard' ? colors.status.error + '20' : colors.status.warning + '20'
+                          }]}>
+                            <Text style={[styles.difficultyText, {
+                              color: rec.difficulty === 'easy' ? colors.status.success :
+                                rec.difficulty === 'hard' ? colors.status.error : colors.status.warning
+                            }]}>
+                              {rec.difficulty === 'easy' ? 'Easy' : rec.difficulty === 'hard' ? 'Hard' : 'Medium'}
+                            </Text>
+                          </View>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+                </View>
+              )}
+
+              {/* Topic Picker */}
+              <View style={styles.section}>
+                <Text style={styles.sectionLabel}>Topic</Text>
+
+                {topics.length > 0 ? (
+                  <TouchableOpacity
+                    style={styles.topicSelector}
+                    onPress={() => setShowTopicPicker(!showTopicPicker)}
+                  >
+                    <Text style={selectedTopicId ? styles.topicText : styles.topicPlaceholder}>
+                      {selectedTopic?.nameKr || '커리큘럼에서 선택...'}
+                    </Text>
+                    <ChevronDownIcon size={20} color={colors.text.muted} />
+                  </TouchableOpacity>
+                ) : null}
+
+                {showTopicPicker && topics.length > 0 && (
+                  <View style={styles.topicList}>
+                    {['basic', 'intermediate', 'advanced'].map(level => {
+                      const levelTopics = topics.filter(t => t.level === level);
+                      if (levelTopics.length === 0) return null;
+                      return (
+                        <View key={level}>
+                          <Text style={styles.levelLabel}>
+                            {level === 'basic' ? 'Basic' : level === 'intermediate' ? 'Intermediate' : 'Advanced'}
+                          </Text>
+                          {levelTopics.map(topic => (
+                            <TouchableOpacity
+                              key={topic.id}
+                              style={[styles.topicItem, selectedTopicId === topic.id && styles.topicItemActive]}
+                              onPress={() => {
+                                setSelectedTopicId(topic.id);
+                                setCustomTopic('');
+                                setShowTopicPicker(false);
+                              }}
+                            >
+                              <Text style={[styles.topicItemText, selectedTopicId === topic.id && styles.topicItemTextActive]}>
+                                {topic.nameKr}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      );
+                    })}
+                  </View>
+                )}
+
+                <TextInput
+                  style={styles.customTopicInput}
+                  placeholder="Or type your own..."
+                  placeholderTextColor={colors.text.muted}
+                  value={customTopic}
+                  onChangeText={(text) => {
+                    setCustomTopic(text);
+                    if (text) setSelectedTopicId(null);
+                  }}
+                />
+              </View>
 
               {/* Rating */}
-              <RatingSelector
-                value={rating}
-                onChange={setRating}
-              />
+              <RatingSelector value={rating} onChange={setRating} />
 
-              {/* Struggles (Optional) */}
+              {/* Struggles */}
               <View style={styles.section}>
-                <Text style={styles.sectionLabel}>ANY STRUGGLES?</Text>
+                <Text style={styles.sectionLabel}>Struggles</Text>
                 <View style={styles.struggleGrid}>
                   {STRUGGLES.map((item) => {
                     const isActive = struggles.includes(item.id);
@@ -204,10 +409,7 @@ export default function LogScreen() {
                         style={[styles.struggleItem, isActive && styles.struggleItemActive]}
                         onPress={() => toggleStruggle(item.id)}
                       >
-                        <item.Icon
-                          size={16}
-                          color={isActive ? colors.status.warning : colors.text.muted}
-                        />
+                        <item.Icon size={16} color={isActive ? colors.status.warning : colors.text.muted} />
                         <Text style={[styles.struggleText, isActive && styles.struggleTextActive]}>
                           {item.label}
                         </Text>
@@ -217,28 +419,55 @@ export default function LogScreen() {
                 </View>
               </View>
 
+              {/* Photo Attachments */}
+              <View style={styles.section}>
+                <Text style={styles.sectionLabel}>사진 첨부</Text>
+                <View style={styles.photoGrid}>
+                  {photos.map((uri, index) => (
+                    <View key={index} style={styles.photoContainer}>
+                      <Image source={{ uri }} style={styles.photo} />
+                      <TouchableOpacity style={styles.removePhotoBtn} onPress={() => removePhoto(index)}>
+                        <XIcon size={12} color="#fff" />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                  {photos.length < 5 && (
+                    <View style={styles.addPhotoButtons}>
+                      <TouchableOpacity style={styles.addPhotoBtn} onPress={handlePickPhoto}>
+                        <PlusIcon size={20} color={colors.text.muted} />
+                        <Text style={styles.addPhotoText}>갤러리</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.addPhotoBtn} onPress={handleTakePhoto}>
+                        <PlusIcon size={20} color={colors.text.muted} />
+                        <Text style={styles.addPhotoText}>카메라</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              </View>
+
               {/* Voice Memo */}
               <VoiceRecorder onTranscription={handleVoiceTranscription} />
 
               {/* Notes & AI */}
               <View style={styles.section}>
-                <Text style={styles.sectionLabel}>NOTES</Text>
+                <Text style={styles.sectionLabel}>메모</Text>
                 <TextInput
                   style={styles.notesInput}
-                  placeholder="Quick notes about progress..."
+                  placeholder="수업 내용을 기록하세요..."
                   placeholderTextColor={colors.text.muted}
                   multiline
                   value={notes}
                   onChangeText={setNotes}
                 />
 
-                {notes.length > 10 && (
+                {notes.length > 10 && rating && (
                   <Button
-                    title="Generate AI Insights"
+                    title="AI 인사이트 생성"
                     variant="ghost"
                     size="sm"
-                    loading={isExtracting}
-                    onPress={handleExtractInsights}
+                    loading={isGeneratingInsights}
+                    onPress={handleGenerateInsights}
                     icon={<SparklesIcon size={16} color={colors.accent.default} />}
                     style={{ alignSelf: 'flex-start', marginTop: 8 }}
                   />
@@ -248,34 +477,59 @@ export default function LogScreen() {
                   <Card variant="glow" style={{ marginTop: 16 }}>
                     <View style={layout.row}>
                       <SparklesIcon size={16} color={colors.accent.default} />
-                      <Text style={[typography.small, { color: colors.accent.default, marginLeft: 8 }]}>AI Insight</Text>
+                      <Text style={[typography.small, { color: colors.accent.default, marginLeft: 8 }]}>
+                        AI 인사이트
+                      </Text>
                     </View>
-                    <Text style={[typography.body, { color: colors.text.secondary, marginTop: 8, fontSize: 14 }]}>
-                      {aiInsights}
-                    </Text>
+                    <Text style={styles.insightSummary}>{aiInsights.summary}</Text>
+
+                    {aiInsights.nextSteps?.length > 0 && (
+                      <View style={styles.insightSection}>
+                        <Text style={styles.insightLabel}>다음 수업 추천:</Text>
+                        {aiInsights.nextSteps.map((step: string, i: number) => (
+                          <Text key={i} style={styles.insightItem}>• {step}</Text>
+                        ))}
+                      </View>
+                    )}
+
+                    {aiInsights.encouragement && (
+                      <Text style={styles.insightEncouragement}>{aiInsights.encouragement}</Text>
+                    )}
                   </Card>
                 )}
               </View>
 
-              {/* Homework Tracker (New) */}
+              {/* Zoom Recording URL */}
               <View style={styles.section}>
-                <Text style={styles.sectionLabel}>HOMEWORK</Text>
+                <Text style={styles.sectionLabel}>Zoom 녹화 링크 (선택)</Text>
                 <TextInput
                   style={styles.input}
-                  placeholder="Assign homework for next time..."
+                  placeholder="https://zoom.us/rec/..."
+                  placeholderTextColor={colors.text.muted}
+                  value={zoomRecordingUrl}
+                  onChangeText={setZoomRecordingUrl}
+                  autoCapitalize="none"
+                />
+              </View>
+
+              {/* Homework */}
+              <View style={styles.section}>
+                <Text style={styles.sectionLabel}>숙제</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="다음 시간까지 할 숙제..."
                   placeholderTextColor={colors.text.muted}
                   value={homework}
                   onChangeText={setHomework}
                 />
               </View>
 
-              {/* Submit Action */}
+              {/* Submit */}
               <View style={{ marginTop: spacing.xl }}>
                 <Button
-                  title={activeSession ? "Finish Class & Save" : "Save Lesson Log"}
+                  title={activeSession ? "수업 종료 & 저장" : "수업 기록 저장"}
                   onPress={handleSave}
                   disabled={!rating}
-                  variant={activeSession ? 'primary' : 'primary'}
                 />
               </View>
             </>
@@ -288,7 +542,7 @@ export default function LogScreen() {
       {showToast && (
         <View style={styles.toast}>
           <CheckCircleIcon size={20} color={colors.status.success} />
-          <Text style={styles.toastText}>Lesson Saved!</Text>
+          <Text style={styles.toastText}>저장 완료!</Text>
         </View>
       )}
     </SafeAreaView>
@@ -338,7 +592,113 @@ const styles = StyleSheet.create({
     color: colors.text.muted,
     marginBottom: spacing.md,
     letterSpacing: 1,
+    textTransform: 'uppercase',
   },
+  // Topic Picker
+  topicSelector: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: colors.bg.secondary,
+    borderRadius: radius.md,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+  },
+  topicText: {
+    ...typography.body,
+    color: colors.text.primary,
+  },
+  topicPlaceholder: {
+    ...typography.body,
+    color: colors.text.muted,
+  },
+  topicList: {
+    backgroundColor: colors.bg.secondary,
+    borderRadius: radius.md,
+    marginTop: spacing.sm,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+  },
+  levelLabel: {
+    ...typography.caption,
+    color: colors.accent.default,
+    marginTop: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  topicItem: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: radius.sm,
+  },
+  topicItemActive: {
+    backgroundColor: colors.accent.default + '20',
+  },
+  topicItemText: {
+    ...typography.small,
+    color: colors.text.secondary,
+  },
+  topicItemTextActive: {
+    color: colors.accent.default,
+    fontWeight: '600',
+  },
+  customTopicInput: {
+    backgroundColor: colors.bg.secondary,
+    borderRadius: radius.md,
+    padding: spacing.lg,
+    color: colors.text.primary,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+    marginTop: spacing.sm,
+    ...typography.body,
+  },
+  // Recommendations
+  recommendationHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+  },
+  recommendationTitle: {
+    ...typography.small,
+    color: colors.accent.default,
+    fontWeight: '600',
+  },
+  recommendationList: {
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  recommendationItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: colors.bg.secondary,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+  },
+  recTopic: {
+    ...typography.small,
+    color: colors.text.primary,
+    fontWeight: '600',
+  },
+  recReason: {
+    ...typography.caption,
+    color: colors.text.muted,
+    marginTop: 2,
+  },
+  difficultyBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: radius.sm,
+  },
+  difficultyText: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  // Struggles
   struggleGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -367,6 +727,52 @@ const styles = StyleSheet.create({
     color: colors.status.warning,
     fontWeight: '600',
   },
+  // Photos
+  photoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  photoContainer: {
+    position: 'relative',
+  },
+  photo: {
+    width: 80,
+    height: 80,
+    borderRadius: radius.md,
+  },
+  removePhotoBtn: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: colors.status.error,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addPhotoButtons: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  addPhotoBtn: {
+    width: 80,
+    height: 80,
+    borderRadius: radius.md,
+    backgroundColor: colors.bg.secondary,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addPhotoText: {
+    ...typography.caption,
+    color: colors.text.muted,
+    marginTop: 4,
+  },
+  // Notes
   notesInput: {
     backgroundColor: colors.bg.secondary,
     borderRadius: radius.md,
@@ -387,6 +793,33 @@ const styles = StyleSheet.create({
     borderColor: colors.border.default,
     ...typography.body,
   },
+  // AI Insights
+  insightSummary: {
+    ...typography.body,
+    color: colors.text.secondary,
+    marginTop: spacing.md,
+    fontSize: 14,
+  },
+  insightSection: {
+    marginTop: spacing.md,
+  },
+  insightLabel: {
+    ...typography.caption,
+    color: colors.text.muted,
+    marginBottom: 4,
+  },
+  insightItem: {
+    ...typography.small,
+    color: colors.text.secondary,
+    marginLeft: 8,
+  },
+  insightEncouragement: {
+    ...typography.caption,
+    color: colors.accent.default,
+    marginTop: spacing.md,
+    fontStyle: 'italic',
+  },
+  // Toast
   toast: {
     position: 'absolute',
     bottom: 100,
@@ -416,5 +849,5 @@ const styles = StyleSheet.create({
     height: 12,
     borderRadius: 6,
     backgroundColor: colors.status.error,
-  }
+  },
 });

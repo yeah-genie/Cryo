@@ -41,7 +41,7 @@ serve(async (req) => {
             const error = url.searchParams.get("error")
 
             if (error) {
-                const appRedirect = new URL(state || "chalk://stripe-callback")
+                const appRedirect = new URL(state || "chalkapp://stripe-callback")
                 appRedirect.searchParams.set("error", error)
                 return Response.redirect(appRedirect.toString(), 302)
             }
@@ -69,13 +69,13 @@ serve(async (req) => {
             const tokenData = await tokenResponse.json()
 
             if (tokenData.error) {
-                const appRedirect = new URL(state || "chalk://stripe-callback")
+                const appRedirect = new URL(state || "chalkapp://stripe-callback")
                 appRedirect.searchParams.set("error", tokenData.error_description || tokenData.error)
                 return Response.redirect(appRedirect.toString(), 302)
             }
 
             // Redirect back to app with tokens
-            const appRedirect = new URL(state || "chalk://stripe-callback")
+            const appRedirect = new URL(state || "chalkapp://stripe-callback")
             appRedirect.searchParams.set("access_token", tokenData.access_token)
             appRedirect.searchParams.set("stripe_user_id", tokenData.stripe_user_id)
             appRedirect.searchParams.set("refresh_token", tokenData.refresh_token || "")

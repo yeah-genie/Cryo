@@ -40,7 +40,7 @@ serve(async (req) => {
             const error = url.searchParams.get("error")
 
             if (error) {
-                const appRedirect = new URL(state || "chalk://zoom-callback")
+                const appRedirect = new URL(state || "chalkapp://zoom-callback")
                 appRedirect.searchParams.set("error", error)
                 return Response.redirect(appRedirect.toString(), 302)
             }
@@ -70,7 +70,7 @@ serve(async (req) => {
             const tokenData = await tokenResponse.json()
 
             if (tokenData.error) {
-                const appRedirect = new URL(state || "chalk://zoom-callback")
+                const appRedirect = new URL(state || "chalkapp://zoom-callback")
                 appRedirect.searchParams.set("error", tokenData.error)
                 return Response.redirect(appRedirect.toString(), 302)
             }
@@ -84,7 +84,7 @@ serve(async (req) => {
             const userData = await userResponse.json()
 
             // Redirect back to app with tokens
-            const appRedirect = new URL(state || "chalk://zoom-callback")
+            const appRedirect = new URL(state || "chalkapp://zoom-callback")
             appRedirect.searchParams.set("access_token", tokenData.access_token)
             appRedirect.searchParams.set("user_name", userData.first_name || "Zoom User")
             appRedirect.searchParams.set("user_email", userData.email || "")

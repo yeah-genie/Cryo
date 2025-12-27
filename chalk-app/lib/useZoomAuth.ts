@@ -17,11 +17,26 @@ export interface ZoomUser {
     pic_url?: string;
 }
 
+export interface ZoomRecording {
+    id: string;
+    topic: string;
+    start_time: string;
+    duration: number; // in minutes
+    recording_files?: Array<{
+        id: string;
+        file_type: string;
+        play_url?: string;
+        download_url?: string;
+    }>;
+}
+
 export function useZoomAuth() {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [user, setUser] = useState<ZoomUser | null>(null);
     const [accessToken, setAccessToken] = useState<string | null>(null);
+    const [recordings, setRecordings] = useState<ZoomRecording[]>([]);
+    const [isLoadingRecordings, setIsLoadingRecordings] = useState(false);
 
     // Load stored data on mount
     useEffect(() => {
@@ -126,7 +141,7 @@ export function useZoomAuth() {
             }
         } catch (error) {
             console.error('[Zoom] Failed to start auth:', error);
-            Alert.alert('오류', 'Zoom 연결을 시작할 수 없습니다.');
+            Alert.alert('Error', 'Could not connect to Zoom.');
             throw error;
         }
     }, []);
@@ -144,13 +159,66 @@ export function useZoomAuth() {
         }
     }, []);
 
+    // Fetch cloud recordings from Zoom API
+    const fetchRecordings = useCallback(async () => {
+        if (!accessToken) {
+            console.log('[Zoom] No access token for fetching recordings');
+            return [];
+        }
+
+        setIsLoadingRecordings(true);
+        try {
+            // Get recordings from last 30 days
+            const fromDate = new Date();
+            fromDate.setDate(fromDate.getDate() - 30);
+            const from = fromDate.toISOString().split('T')[0];
+            const to = new Date().toISOString().split('T')[0];
+
+            const response = await fetch(
+                `https://api.zoom.us/v2/users/me/recordings?from=${from}&to=${to}`,
+                {
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json',
+                    },
+                }
+            );
+
+            if (!response.ok) {
+                console.error('[Zoom] Failed to fetch recordings:', response.status);
+                return [];
+            }
+
+            const data = await response.json();
+            const meetingRecordings: ZoomRecording[] = (data.meetings || []).map((m: any) => ({
+                id: m.uuid,
+                topic: m.topic,
+                start_time: m.start_time,
+                duration: m.duration,
+                recording_files: m.recording_files,
+            }));
+
+            setRecordings(meetingRecordings);
+            console.log(`[Zoom] Fetched ${meetingRecordings.length} recordings`);
+            return meetingRecordings;
+        } catch (error) {
+            console.error('[Zoom] Error fetching recordings:', error);
+            return [];
+        } finally {
+            setIsLoadingRecordings(false);
+        }
+    }, [accessToken]);
+
     return {
         isAuthenticated,
         isLoading,
         user,
         accessToken,
+        recordings,
+        isLoadingRecordings,
         signIn,
         signOut,
+        fetchRecordings,
         isReady: true,
     };
 }

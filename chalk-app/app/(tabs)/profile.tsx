@@ -1,104 +1,188 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, Alert, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, Alert, Share, TouchableOpacity } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors, typography, spacing, radius } from '@/constants/Colors';
+import { colors, typography, spacing } from '@/constants/Colors';
 import { layout } from '@/components/ui/Theme';
 import { Card } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
+import { IntegrationCard, IntegrationStatus } from '@/components/ui/IntegrationCard';
 import { useGoogleAuth } from '@/lib/useGoogleAuth';
 import { useZoomAuth } from '@/lib/useZoomAuth';
 import { useStripeAuth } from '@/lib/useStripeAuth';
-import { CheckCircleIcon, ChevronRightIcon } from '@/components/Icons';
+import { useNotifications } from '@/lib/useNotifications';
+import { ChevronRightIcon, UsersIcon } from '@/components/Icons';
+import { StudentManager } from '@/components/ui/StudentManager';
+import { useData } from '@/lib/DataContext';
 
 // Logo images
 const GoogleCalendarLogo = require('@/assets/images/google-calendar.png');
 const ZoomLogo = require('@/assets/images/zoom.png');
 const StripeLogo = require('@/assets/images/stripe.png');
 
+type ServiceKey = 'google' | 'zoom' | 'stripe';
+
+interface ConnectionState {
+  status: IntegrationStatus;
+  error?: string;
+}
+
 export default function AccountScreen() {
   const googleAuth = useGoogleAuth();
   const zoomAuth = useZoomAuth();
   const stripeAuth = useStripeAuth();
+  const notifications = useNotifications();
+  const { students, lessonLogs, scheduledLessons } = useData();
 
-  const [connectingService, setConnectingService] = React.useState<string | null>(null);
+  // Get display name from connected accounts
+  const displayName = googleAuth.user?.name || zoomAuth.user?.name || 'Tutor';
+  const displayEmail = googleAuth.user?.email || zoomAuth.user?.email || 'Connect Google to sync';
+  const initials = displayName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || 'T';
 
-  const handleGoogleConnect = async () => {
-    if (!googleAuth.isReady) {
-      Alert.alert('잠시만요', 'Google 연동을 준비 중입니다...');
-      return;
-    }
+  // Connection states for each service
+  const [connectionStates, setConnectionStates] = useState<Record<ServiceKey, ConnectionState>>({
+    google: { status: 'idle' },
+    zoom: { status: 'idle' },
+    stripe: { status: 'idle' },
+  });
+
+  const [showStudentManager, setShowStudentManager] = useState(false);
+
+  // Update status when auth state changes
+  useEffect(() => {
+    setConnectionStates(prev => ({
+      ...prev,
+      google: {
+        status: googleAuth.isAuthenticated ? 'connected' :
+          !googleAuth.isReady ? 'idle' : prev.google.status === 'connecting' ? 'connecting' : 'idle'
+      },
+    }));
+  }, [googleAuth.isAuthenticated, googleAuth.isReady]);
+
+  useEffect(() => {
+    setConnectionStates(prev => ({
+      ...prev,
+      zoom: {
+        status: zoomAuth.isAuthenticated ? 'connected' :
+          prev.zoom.status === 'connecting' ? 'connecting' : 'idle'
+      },
+    }));
+  }, [zoomAuth.isAuthenticated]);
+
+  useEffect(() => {
+    setConnectionStates(prev => ({
+      ...prev,
+      stripe: {
+        status: stripeAuth.isAuthenticated ? 'connected' :
+          prev.stripe.status === 'connecting' ? 'connecting' : 'idle'
+      },
+    }));
+  }, [stripeAuth.isAuthenticated]);
+
+  const handleConnect = async (service: ServiceKey, signInFn: () => Promise<void>) => {
+    // Update to connecting state
+    setConnectionStates(prev => ({
+      ...prev,
+      [service]: { status: 'connecting' },
+    }));
+
     try {
-      setConnectingService('google');
-      await googleAuth.signIn();
-    } catch (error) {
-      Alert.alert('연결 실패', 'Google 연동에 실패했습니다. 다시 시도해주세요.');
-    } finally {
-      setConnectingService(null);
+      await signInFn();
+
+      // Show success animation briefly
+      setConnectionStates(prev => ({
+        ...prev,
+        [service]: { status: 'success' },
+      }));
+
+      // Then transition to connected state
+      setTimeout(() => {
+        setConnectionStates(prev => ({
+          ...prev,
+          [service]: { status: 'connected' },
+        }));
+      }, 1500);
+
+      // Request notification permission after Zoom connection
+      if (service === 'zoom') {
+        notifications.requestPermission();
+      }
+
+    } catch (error: any) {
+      const errorMessage = error?.message || 'Connection failed.';
+      setConnectionStates(prev => ({
+        ...prev,
+        [service]: { status: 'error', error: errorMessage },
+      }));
     }
   };
 
-  const handleZoomConnect = async () => {
+  const handleDisconnect = async (service: ServiceKey, signOutFn: () => Promise<void>) => {
     try {
-      setConnectingService('zoom');
-      await zoomAuth.signIn();
+      await signOutFn();
+      setConnectionStates(prev => ({
+        ...prev,
+        [service]: { status: 'idle' },
+      }));
     } catch (error) {
-      Alert.alert('연결 실패', 'Zoom 연동에 실패했습니다. 다시 시도해주세요.');
-    } finally {
-      setConnectingService(null);
+      Alert.alert('Error', 'Failed to disconnect.');
     }
   };
 
-  const handleStripeConnect = async () => {
+  // Export all data as JSON
+  const handleExportData = async () => {
     try {
-      setConnectingService('stripe');
-      await stripeAuth.signIn();
+      const exportData = {
+        exportDate: new Date().toISOString(),
+        students,
+        lessonLogs,
+        scheduledLessons,
+      };
+
+      const jsonString = JSON.stringify(exportData, null, 2);
+
+      await Share.share({
+        message: jsonString,
+        title: 'Chalk Data Export',
+      });
     } catch (error) {
-      Alert.alert('연결 실패', 'Stripe 연동에 실패했습니다. 다시 시도해주세요.');
-    } finally {
-      setConnectingService(null);
+      Alert.alert('Error', 'Failed to export data.');
     }
   };
 
-  const renderConnectButton = (
-    service: 'google' | 'zoom' | 'stripe',
-    isAuthenticated: boolean,
-    onConnect: () => void,
-    onDisconnect: () => void,
-    isReady: boolean = true
-  ) => {
-    const isConnecting = connectingService === service;
+  // Log out - clear all tokens
+  const handleLogOut = async () => {
+    Alert.alert(
+      'Log Out',
+      'This will sign out of all connected services and clear local data.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Log Out',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // Sign out of all services
+              if (googleAuth.isAuthenticated) await googleAuth.signOut();
+              if (zoomAuth.isAuthenticated) await zoomAuth.signOut();
+              if (stripeAuth.isAuthenticated) await stripeAuth.signOut();
 
-    if (isConnecting) {
-      return (
-        <View style={styles.connectingContainer}>
-          <ActivityIndicator size="small" color={colors.accent.default} />
-          <Text style={styles.connectingText}>연결 중...</Text>
-        </View>
-      );
-    }
+              // Clear AsyncStorage
+              await AsyncStorage.clear();
 
-    if (isAuthenticated) {
-      return (
-        <View style={styles.connectedContainer}>
-          <CheckCircleIcon size={16} color={colors.status.success} />
-          <Button
-            title="Disconnect"
-            size="sm"
-            variant="outline"
-            onPress={onDisconnect}
-          />
-        </View>
-      );
-    }
+              // Reset connection states
+              setConnectionStates({
+                google: { status: 'idle' },
+                zoom: { status: 'idle' },
+                stripe: { status: 'idle' },
+              });
 
-    return (
-      <Button
-        title="Connect"
-        size="sm"
-        variant="secondary"
-        onPress={onConnect}
-        disabled={!isReady}
-      />
+              Alert.alert('Success', 'Logged out successfully.');
+            } catch (error) {
+              Alert.alert('Error', 'Failed to log out completely.');
+            }
+          },
+        },
+      ]
     );
   };
 
@@ -113,111 +197,98 @@ export default function AccountScreen() {
         <Card style={styles.profileCard}>
           <View style={styles.profileRow}>
             <View style={styles.avatar}>
-              <Text style={styles.avatarText}>AC</Text>
+              <Text style={styles.avatarText}>{initials}</Text>
             </View>
             <View>
-              <Text style={typography.h3}>Alex Chen</Text>
-              <Text style={styles.profileEmail}>alex.chen@tutor.com</Text>
+              <Text style={typography.h3}>{displayName}</Text>
+              <Text style={styles.profileEmail}>{displayEmail}</Text>
             </View>
           </View>
-          <View style={styles.badgeRow}>
-            <View style={styles.proBadge}>
-              <Text style={styles.proText}>PRO PLAN</Text>
+          {(googleAuth.isAuthenticated || zoomAuth.isAuthenticated || stripeAuth.isAuthenticated) && (
+            <View style={styles.badgeRow}>
+              <View style={styles.proBadge}>
+                <Text style={styles.proText}>VERIFIED</Text>
+              </View>
             </View>
-          </View>
+          )}
         </Card>
 
         {/* Integrations Section */}
         <Text style={styles.sectionTitle}>INTEGRATIONS</Text>
-        <Text style={styles.sectionSubtitle}>서비스를 연결하여 포트폴리오를 인증하세요</Text>
+        <Text style={styles.sectionSubtitle}>Connect services to verify your portfolio</Text>
 
         {/* Google Calendar */}
-        <Card style={styles.integrationCard}>
-          <View style={styles.integrationRow}>
-            <View style={layout.row}>
-              <Image source={GoogleCalendarLogo} style={styles.logoImage} />
-              <View style={styles.integrationInfo}>
-                <Text style={styles.integrationName}>Google Calendar</Text>
-                <Text style={styles.integrationStatus}>
-                  {googleAuth.isAuthenticated
-                    ? `✓ ${googleAuth.user?.email || 'Connected'}`
-                    : googleAuth.isReady
-                      ? '수업 일정을 자동으로 가져옵니다'
-                      : '준비 중...'}
-                </Text>
-              </View>
-            </View>
-            {renderConnectButton(
-              'google',
-              googleAuth.isAuthenticated,
-              handleGoogleConnect,
-              googleAuth.signOut,
-              googleAuth.isReady
-            )}
-          </View>
-        </Card>
+        <IntegrationCard
+          name="Google Calendar"
+          description="Sync your lesson schedule"
+          logo={GoogleCalendarLogo}
+          status={connectionStates.google.status}
+          connectedInfo={googleAuth.user?.email}
+          errorMessage={connectionStates.google.error}
+          onConnect={() => handleConnect('google', googleAuth.signIn)}
+          onDisconnect={() => handleDisconnect('google', googleAuth.signOut)}
+          onRetry={() => handleConnect('google', googleAuth.signIn)}
+        />
 
         {/* Zoom */}
-        <Card style={styles.integrationCard}>
-          <View style={styles.integrationRow}>
-            <View style={layout.row}>
-              <Image source={ZoomLogo} style={styles.logoImage} />
-              <View style={styles.integrationInfo}>
-                <Text style={styles.integrationName}>Zoom</Text>
-                <Text style={styles.integrationStatus}>
-                  {zoomAuth.isAuthenticated
-                    ? `✓ ${zoomAuth.user?.email || 'Connected'}`
-                    : '화상 수업 기록을 자동으로 가져옵니다'}
-                </Text>
-              </View>
-            </View>
-            {renderConnectButton(
-              'zoom',
-              zoomAuth.isAuthenticated,
-              handleZoomConnect,
-              zoomAuth.signOut
-            )}
-          </View>
-        </Card>
+        <IntegrationCard
+          name="Zoom"
+          description="Import video lesson records"
+          logo={ZoomLogo}
+          status={connectionStates.zoom.status}
+          connectedInfo={zoomAuth.user?.email}
+          errorMessage={connectionStates.zoom.error}
+          onConnect={() => handleConnect('zoom', zoomAuth.signIn)}
+          onDisconnect={() => handleDisconnect('zoom', zoomAuth.signOut)}
+          onRetry={() => handleConnect('zoom', zoomAuth.signIn)}
+        />
 
         {/* Stripe */}
-        <Card style={styles.integrationCard}>
-          <View style={styles.integrationRow}>
-            <View style={layout.row}>
-              <Image source={StripeLogo} style={styles.logoImage} />
-              <View style={styles.integrationInfo}>
-                <Text style={styles.integrationName}>Stripe</Text>
-                <Text style={styles.integrationStatus}>
-                  {stripeAuth.isAuthenticated
-                    ? `✓ ${stripeAuth.account?.id || 'Connected'}`
-                    : '결제 내역을 자동으로 가져옵니다'}
-                </Text>
-              </View>
+        <IntegrationCard
+          name="Stripe"
+          description="Import your payment history"
+          logo={StripeLogo}
+          status={connectionStates.stripe.status}
+          connectedInfo={stripeAuth.account?.id}
+          errorMessage={connectionStates.stripe.error}
+          onConnect={() => handleConnect('stripe', stripeAuth.signIn)}
+          onDisconnect={() => handleDisconnect('stripe', stripeAuth.signOut)}
+          onRetry={() => handleConnect('stripe', stripeAuth.signIn)}
+        />
+
+        {/* Students Section */}
+        <Text style={styles.sectionTitle}>STUDENTS</Text>
+        <Card style={styles.settingsCard}>
+          <View style={styles.settingItem} onTouchEnd={() => setShowStudentManager(true)}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <UsersIcon size={20} color={colors.text.secondary} />
+              <Text style={styles.settingLabel}>Manage Students</Text>
             </View>
-            {renderConnectButton(
-              'stripe',
-              stripeAuth.isAuthenticated,
-              handleStripeConnect,
-              stripeAuth.signOut
-            )}
+            <ChevronRightIcon size={20} color={colors.text.secondary} />
           </View>
         </Card>
 
         {/* Settings Section */}
         <Text style={styles.sectionTitle}>SETTINGS</Text>
         <Card style={styles.settingsCard}>
-          <View style={styles.settingItem}>
+          <TouchableOpacity style={styles.settingItem} onPress={handleExportData}>
             <Text style={styles.settingLabel}>Export Data</Text>
             <ChevronRightIcon size={20} color={colors.text.secondary} />
-          </View>
-          <View style={[styles.settingItem, { borderBottomWidth: 0 }]}>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.settingItem, { borderBottomWidth: 0 }]} onPress={handleLogOut}>
             <Text style={[styles.settingLabel, { color: colors.status.error }]}>Log Out</Text>
-          </View>
+          </TouchableOpacity>
         </Card>
 
         <Text style={styles.versionText}>Version 1.0.2 (Build 14)</Text>
 
       </ScrollView>
+
+      {/* Student Manager Modal */}
+      <StudentManager
+        visible={showStudentManager}
+        onClose={() => setShowStudentManager(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -283,58 +354,6 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
     marginBottom: spacing.md,
     marginLeft: 4,
-  },
-  integrationCard: {
-    marginBottom: spacing.md,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-  },
-  integrationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  iconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  logoImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    marginRight: 12,
-  },
-  integrationInfo: {
-    justifyContent: 'center',
-    flex: 1,
-  },
-  integrationName: {
-    ...typography.small,
-    color: colors.text.primary,
-    fontWeight: '600',
-  },
-  integrationStatus: {
-    ...typography.caption,
-    color: colors.text.secondary,
-    fontSize: 11,
-  },
-  connectingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  connectingText: {
-    ...typography.caption,
-    color: colors.accent.default,
-  },
-  connectedContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
   },
   settingsCard: {
     marginBottom: spacing.xl,

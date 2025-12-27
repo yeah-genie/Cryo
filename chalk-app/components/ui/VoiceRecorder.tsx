@@ -1,18 +1,17 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Platform } from 'react-native';
+import { Audio } from 'expo-av';
 import { colors, radius, spacing, typography } from '@/constants/Colors';
-import { Button } from '@/components/ui/Button';
-
-// Mock Icon for Microphone (using simple circle/shapes if icon not available, or assume VideoIcon style)
-// We'll use a simple visual representation for now or import an icon if available.
-import { Svg, Circle, Path, Rect } from 'react-native-svg';
+import { Svg, Path, Rect } from 'react-native-svg';
 
 function MicIcon({ size = 24, color = colors.text.primary, active = false }) {
+    const fillColor = active ? colors.status.error : "none";
+    const strokeColor = active ? colors.status.error : color;
     return (
         <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-            <Rect x="9" y="3" width="6" height="12" rx="3" fill={active ? colors.status.error : "none"} stroke={active ? colors.status.error : color} strokeWidth="2" />
-            <Path d="M5 10V11C5 14.866 8.13401 18 12 18C15.866 18 19 14.866 19 11V10" stroke={active ? colors.status.error : color} strokeWidth="2" strokeLinecap="round" />
-            <Path d="M12 18V22M8 22H16" stroke={active ? colors.status.error : color} strokeWidth="2" strokeLinecap="round" />
+            <Rect x="9" y="3" width="6" height="12" rx="3" fill={fillColor} stroke={strokeColor} strokeWidth="2" />
+            <Path d="M5 10V11C5 14.866 8.13401 18 12 18C15.866 18 19 14.866 19 11V10" stroke={strokeColor} strokeWidth="2" strokeLinecap="round" />
+            <Path d="M12 18V22M8 22H16" stroke={strokeColor} strokeWidth="2" strokeLinecap="round" />
         </Svg>
     );
 }
@@ -25,9 +24,23 @@ export function VoiceRecorder({ onTranscription }: VoiceRecorderProps) {
     const [isRecording, setIsRecording] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
     const [duration, setDuration] = useState(0);
+    const [permissionGranted, setPermissionGranted] = useState(false);
+    const recordingRef = useRef<Audio.Recording | null>(null);
 
     useEffect(() => {
-        let interval: NodeJS.Timeout;
+        // Request permission on mount
+        (async () => {
+            try {
+                const { status } = await Audio.requestPermissionsAsync();
+                setPermissionGranted(status === 'granted');
+            } catch (error) {
+                console.log('Audio permission error:', error);
+            }
+        })();
+    }, []);
+
+    useEffect(() => {
+        let interval: ReturnType<typeof setInterval>;
         if (isRecording) {
             interval = setInterval(() => setDuration(d => d + 1), 1000);
         } else {
@@ -36,20 +49,72 @@ export function VoiceRecorder({ onTranscription }: VoiceRecorderProps) {
         return () => clearInterval(interval);
     }, [isRecording]);
 
-    const handleToggleRecord = () => {
-        if (isRecording) {
-            // Stop recording logic
-            setIsRecording(false);
-            setIsProcessing(true);
+    const startRecording = async () => {
+        if (!permissionGranted) {
+            Alert.alert('Permission Required', 'Microphone access is needed to record voice memos.');
+            return;
+        }
 
-            // Simulate processing
-            setTimeout(() => {
-                setIsProcessing(false);
-                onTranscription("Student showed good understanding of quadratic formulas but struggled with factoring large numbers. Assigned pg. 42 #1-10 for homework.");
-            }, 1500);
-        } else {
-            // Start recording
+        try {
+            // Configure audio mode
+            await Audio.setAudioModeAsync({
+                allowsRecordingIOS: true,
+                playsInSilentModeIOS: true,
+            });
+
+            // Create and start recording
+            const { recording } = await Audio.Recording.createAsync(
+                Audio.RecordingOptionsPresets.HIGH_QUALITY
+            );
+            recordingRef.current = recording;
             setIsRecording(true);
+        } catch (error) {
+            console.error('Failed to start recording:', error);
+            Alert.alert('Error', 'Failed to start recording. Please try again.');
+        }
+    };
+
+    const stopRecording = async () => {
+        if (!recordingRef.current) return;
+
+        setIsRecording(false);
+        setIsProcessing(true);
+
+        try {
+            await recordingRef.current.stopAndUnloadAsync();
+            const uri = recordingRef.current.getURI();
+            recordingRef.current = null;
+
+            // For now, since we don't have speech-to-text API integrated,
+            // we'll note that a recording was made with the duration
+            const recordedMinutes = Math.floor(duration / 60);
+            const recordedSeconds = duration % 60;
+            const durationStr = recordedMinutes > 0
+                ? `${recordedMinutes}m ${recordedSeconds}s`
+                : `${recordedSeconds}s`;
+
+            // Reset audio mode
+            await Audio.setAudioModeAsync({
+                allowsRecordingIOS: false,
+            });
+
+            // Provide feedback that recording was captured
+            // In a full implementation, this would send to a speech-to-text API
+            onTranscription(`[Voice memo recorded: ${durationStr}] - Audio saved locally`);
+
+        } catch (error) {
+            console.error('Failed to stop recording:', error);
+            Alert.alert('Error', 'Failed to save recording.');
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    const handleToggleRecord = async () => {
+        if (isRecording) {
+            await stopRecording();
+        } else {
+            await startRecording();
         }
     };
 
@@ -81,7 +146,7 @@ export function VoiceRecorder({ onTranscription }: VoiceRecorderProps) {
                 disabled={isProcessing}
             >
                 {isProcessing ? (
-                    <Text style={styles.processingText}>Transcribing...</Text>
+                    <Text style={styles.processingText}>Saving...</Text>
                 ) : (
                     <View style={styles.buttonContent}>
                         <MicIcon size={24} color={isRecording ? colors.status.error : colors.accent.default} active={isRecording} />
@@ -89,11 +154,17 @@ export function VoiceRecorder({ onTranscription }: VoiceRecorderProps) {
                             styles.buttonText,
                             isRecording ? { color: colors.status.error } : { color: colors.accent.default }
                         ]}>
-                            {isRecording ? "Stop Recording" : "Tap to Record Summary"}
+                            {isRecording ? "Stop Recording" : "Tap to Record"}
                         </Text>
                     </View>
                 )}
             </TouchableOpacity>
+
+            {!permissionGranted && (
+                <Text style={styles.permissionText}>
+                    Microphone permission required
+                </Text>
+            )}
         </View>
     );
 }
@@ -159,5 +230,11 @@ const styles = StyleSheet.create({
     processingText: {
         ...typography.small,
         color: colors.text.secondary,
+    },
+    permissionText: {
+        ...typography.caption,
+        color: colors.status.warning,
+        textAlign: 'center',
+        marginTop: spacing.sm,
     },
 });
