@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
+import { Alert } from 'react-native';
 
 const TOKEN_KEY = 'stripe_access_token';
 const ACCOUNT_KEY = 'stripe_account';
@@ -31,9 +32,10 @@ export function useStripeAuth() {
                     setAccessToken(storedToken);
                     setAccount(JSON.parse(storedAccount));
                     setIsAuthenticated(true);
+                    console.log('[Stripe] Loaded stored credentials');
                 }
             } catch (error) {
-                console.error('Failed to load Stripe data:', error);
+                console.error('[Stripe] Failed to load data:', error);
             } finally {
                 setIsLoading(false);
             }
@@ -41,27 +43,28 @@ export function useStripeAuth() {
         loadData();
     }, []);
 
+    // Check for initial URL (app opened via deep link)
+    useEffect(() => {
+        const checkInitialUrl = async () => {
+            try {
+                const initialUrl = await Linking.getInitialURL();
+                if (initialUrl && initialUrl.includes('stripe-callback')) {
+                    console.log('[Stripe] Initial URL detected:', initialUrl);
+                    await handleCallback(initialUrl);
+                }
+            } catch (error) {
+                console.error('[Stripe] Error checking initial URL:', error);
+            }
+        };
+        checkInitialUrl();
+    }, []);
+
     // Handle deep link callback
     useEffect(() => {
         const handleDeepLink = async (event: { url: string }) => {
-            const url = event.url;
-            if (url.includes('stripe-callback')) {
-                const params = new URLSearchParams(url.split('?')[1]);
-                const token = params.get('access_token');
-                const accountId = params.get('stripe_user_id');
-
-                if (token && accountId) {
-                    await SecureStore.setItemAsync(TOKEN_KEY, token);
-                    const accountData = {
-                        id: accountId,
-                        email: params.get('email') || undefined,
-                        business_name: params.get('business_name') || undefined,
-                    };
-                    await SecureStore.setItemAsync(ACCOUNT_KEY, JSON.stringify(accountData));
-                    setAccessToken(token);
-                    setAccount(accountData);
-                    setIsAuthenticated(true);
-                }
+            console.log('[Stripe] Deep link received:', event.url);
+            if (event.url.includes('stripe-callback')) {
+                await handleCallback(event.url);
             }
         };
 
@@ -69,15 +72,60 @@ export function useStripeAuth() {
         return () => subscription.remove();
     }, []);
 
+    const handleCallback = async (url: string) => {
+        try {
+            const params = new URLSearchParams(url.split('?')[1]);
+            const token = params.get('access_token');
+            const accountId = params.get('stripe_user_id');
+            const error = params.get('error');
+
+            if (error) {
+                console.error('[Stripe] OAuth error:', error);
+                Alert.alert('Stripe 연결 실패', error);
+                return;
+            }
+
+            if (token && accountId) {
+                console.log('[Stripe] Token received, saving...');
+                await SecureStore.setItemAsync(TOKEN_KEY, token);
+                const accountData = {
+                    id: accountId,
+                    email: params.get('email') || undefined,
+                    business_name: params.get('business_name') || undefined,
+                };
+                await SecureStore.setItemAsync(ACCOUNT_KEY, JSON.stringify(accountData));
+                setAccessToken(token);
+                setAccount(accountData);
+                setIsAuthenticated(true);
+                console.log('[Stripe] Successfully authenticated!');
+            }
+        } catch (error) {
+            console.error('[Stripe] Error handling callback:', error);
+        }
+    };
+
     const signIn = useCallback(async () => {
         try {
-            // Open Supabase Edge Function which handles Stripe OAuth
+            console.log('[Stripe] Starting OAuth flow...');
+            // Create redirect URL using Expo's Linking
             const redirectUrl = Linking.createURL('stripe-callback');
-            const authUrl = `${SUPABASE_STRIPE_AUTH_URL}/authorize?redirect_uri=${encodeURIComponent(redirectUrl)}`;
+            console.log('[Stripe] Redirect URL:', redirectUrl);
 
-            await WebBrowser.openBrowserAsync(authUrl);
+            const authUrl = `${SUPABASE_STRIPE_AUTH_URL}/authorize?redirect_uri=${encodeURIComponent(redirectUrl)}`;
+            console.log('[Stripe] Auth URL:', authUrl);
+
+            const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUrl);
+            console.log('[Stripe] WebBrowser result:', result);
+
+            if (result.type === 'success' && result.url) {
+                await handleCallback(result.url);
+            } else if (result.type === 'cancel') {
+                console.log('[Stripe] User cancelled');
+            }
         } catch (error) {
-            console.error('Failed to start Stripe auth:', error);
+            console.error('[Stripe] Failed to start auth:', error);
+            Alert.alert('오류', 'Stripe 연결을 시작할 수 없습니다.');
+            throw error;
         }
     }, []);
 
@@ -88,8 +136,9 @@ export function useStripeAuth() {
             setAccessToken(null);
             setAccount(null);
             setIsAuthenticated(false);
+            console.log('[Stripe] Signed out');
         } catch (error) {
-            console.error('Failed to disconnect Stripe:', error);
+            console.error('[Stripe] Failed to sign out:', error);
         }
     }, []);
 

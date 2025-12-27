@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Image, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, typography, spacing, radius } from '@/constants/Colors';
 import { layout } from '@/components/ui/Theme';
@@ -19,6 +19,88 @@ export default function AccountScreen() {
   const googleAuth = useGoogleAuth();
   const zoomAuth = useZoomAuth();
   const stripeAuth = useStripeAuth();
+
+  const [connectingService, setConnectingService] = React.useState<string | null>(null);
+
+  const handleGoogleConnect = async () => {
+    if (!googleAuth.isReady) {
+      Alert.alert('잠시만요', 'Google 연동을 준비 중입니다...');
+      return;
+    }
+    try {
+      setConnectingService('google');
+      await googleAuth.signIn();
+    } catch (error) {
+      Alert.alert('연결 실패', 'Google 연동에 실패했습니다. 다시 시도해주세요.');
+    } finally {
+      setConnectingService(null);
+    }
+  };
+
+  const handleZoomConnect = async () => {
+    try {
+      setConnectingService('zoom');
+      await zoomAuth.signIn();
+    } catch (error) {
+      Alert.alert('연결 실패', 'Zoom 연동에 실패했습니다. 다시 시도해주세요.');
+    } finally {
+      setConnectingService(null);
+    }
+  };
+
+  const handleStripeConnect = async () => {
+    try {
+      setConnectingService('stripe');
+      await stripeAuth.signIn();
+    } catch (error) {
+      Alert.alert('연결 실패', 'Stripe 연동에 실패했습니다. 다시 시도해주세요.');
+    } finally {
+      setConnectingService(null);
+    }
+  };
+
+  const renderConnectButton = (
+    service: 'google' | 'zoom' | 'stripe',
+    isAuthenticated: boolean,
+    onConnect: () => void,
+    onDisconnect: () => void,
+    isReady: boolean = true
+  ) => {
+    const isConnecting = connectingService === service;
+
+    if (isConnecting) {
+      return (
+        <View style={styles.connectingContainer}>
+          <ActivityIndicator size="small" color={colors.accent.default} />
+          <Text style={styles.connectingText}>연결 중...</Text>
+        </View>
+      );
+    }
+
+    if (isAuthenticated) {
+      return (
+        <View style={styles.connectedContainer}>
+          <CheckCircleIcon size={16} color={colors.status.success} />
+          <Button
+            title="Disconnect"
+            size="sm"
+            variant="outline"
+            onPress={onDisconnect}
+          />
+        </View>
+      );
+    }
+
+    return (
+      <Button
+        title="Connect"
+        size="sm"
+        variant="secondary"
+        onPress={onConnect}
+        disabled={!isReady}
+      />
+    );
+  };
 
   return (
     <SafeAreaView style={layout.container} edges={['top']}>
@@ -47,6 +129,7 @@ export default function AccountScreen() {
 
         {/* Integrations Section */}
         <Text style={styles.sectionTitle}>INTEGRATIONS</Text>
+        <Text style={styles.sectionSubtitle}>서비스를 연결하여 포트폴리오를 인증하세요</Text>
 
         {/* Google Calendar */}
         <Card style={styles.integrationCard}>
@@ -56,16 +139,21 @@ export default function AccountScreen() {
               <View style={styles.integrationInfo}>
                 <Text style={styles.integrationName}>Google Calendar</Text>
                 <Text style={styles.integrationStatus}>
-                  {googleAuth.isAuthenticated ? 'Connected' : 'Not Connected'}
+                  {googleAuth.isAuthenticated
+                    ? `✓ ${googleAuth.user?.email || 'Connected'}`
+                    : googleAuth.isReady
+                      ? '수업 일정을 자동으로 가져옵니다'
+                      : '준비 중...'}
                 </Text>
               </View>
             </View>
-            <Button
-              title={googleAuth.isAuthenticated ? "Disconnect" : "Connect"}
-              size="sm"
-              variant={googleAuth.isAuthenticated ? "outline" : "secondary"}
-              onPress={() => googleAuth.isAuthenticated ? googleAuth.signOut() : googleAuth.signIn()}
-            />
+            {renderConnectButton(
+              'google',
+              googleAuth.isAuthenticated,
+              handleGoogleConnect,
+              googleAuth.signOut,
+              googleAuth.isReady
+            )}
           </View>
         </Card>
 
@@ -77,16 +165,18 @@ export default function AccountScreen() {
               <View style={styles.integrationInfo}>
                 <Text style={styles.integrationName}>Zoom</Text>
                 <Text style={styles.integrationStatus}>
-                  {zoomAuth.isAuthenticated ? 'Connected' : 'Not Connected'}
+                  {zoomAuth.isAuthenticated
+                    ? `✓ ${zoomAuth.user?.email || 'Connected'}`
+                    : '화상 수업 기록을 자동으로 가져옵니다'}
                 </Text>
               </View>
             </View>
-            <Button
-              title={zoomAuth.isAuthenticated ? "Disconnect" : "Connect"}
-              size="sm"
-              variant={zoomAuth.isAuthenticated ? "outline" : "secondary"}
-              onPress={() => zoomAuth.isAuthenticated ? zoomAuth.signOut() : zoomAuth.signIn()}
-            />
+            {renderConnectButton(
+              'zoom',
+              zoomAuth.isAuthenticated,
+              handleZoomConnect,
+              zoomAuth.signOut
+            )}
           </View>
         </Card>
 
@@ -97,18 +187,19 @@ export default function AccountScreen() {
               <Image source={StripeLogo} style={styles.logoImage} />
               <View style={styles.integrationInfo}>
                 <Text style={styles.integrationName}>Stripe</Text>
-
                 <Text style={styles.integrationStatus}>
-                  {stripeAuth.isAuthenticated ? 'Active' : 'Setup Required'}
+                  {stripeAuth.isAuthenticated
+                    ? `✓ ${stripeAuth.account?.id || 'Connected'}`
+                    : '결제 내역을 자동으로 가져옵니다'}
                 </Text>
               </View>
             </View>
-            <Button
-              title={stripeAuth.isAuthenticated ? "Manage" : "Connect"}
-              size="sm"
-              variant={stripeAuth.isAuthenticated ? "outline" : "secondary"}
-              onPress={() => stripeAuth.isAuthenticated ? Alert.alert('Stripe', 'Opening Dashboard...') : stripeAuth.signIn()}
-            />
+            {renderConnectButton(
+              'stripe',
+              stripeAuth.isAuthenticated,
+              handleStripeConnect,
+              stripeAuth.signOut
+            )}
           </View>
         </Card>
 
@@ -183,9 +274,15 @@ const styles = StyleSheet.create({
   sectionTitle: {
     ...typography.caption,
     color: colors.text.muted,
-    marginBottom: spacing.md,
+    marginBottom: spacing.xs,
     marginLeft: 4,
     letterSpacing: 1,
+  },
+  sectionSubtitle: {
+    ...typography.caption,
+    color: colors.text.secondary,
+    marginBottom: spacing.md,
+    marginLeft: 4,
   },
   integrationCard: {
     marginBottom: spacing.md,
@@ -211,9 +308,9 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginRight: 12,
   },
-
   integrationInfo: {
     justifyContent: 'center',
+    flex: 1,
   },
   integrationName: {
     ...typography.small,
@@ -223,6 +320,21 @@ const styles = StyleSheet.create({
   integrationStatus: {
     ...typography.caption,
     color: colors.text.secondary,
+    fontSize: 11,
+  },
+  connectingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  connectingText: {
+    ...typography.caption,
+    color: colors.accent.default,
+  },
+  connectedContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   settingsCard: {
     marginBottom: spacing.xl,
